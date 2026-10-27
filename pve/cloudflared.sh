@@ -152,7 +152,10 @@ check() {
   chk "cloudflared running"            systemctl is-active --quiet cloudflared
   chk "cloudflared enabled at boot"    systemctl is-enabled --quiet cloudflared
   chk "Token file 600 root"            test "$(stat -c '%a %U' "$ENV_FILE" 2>/dev/null || true)" = "600 root"
-  if spin "Connections to the Cloudflare network" wait_connections; then
+  # Stopped service: no connection to wait for.
+  if ! systemctl is-active --quiet cloudflared; then
+    ko "No connection to the Cloudflare network (service stopped)"
+  elif spin "Connections to the Cloudflare network" wait_connections; then
     ok "$(connections) connection(s) to the Cloudflare network"
   else
     ko "No connection to the Cloudflare network"

@@ -345,9 +345,15 @@ check() {
   bad=$( { grep -L -x "$saved_epp" "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference || true; } | wc -l)
   epp=$(sort -u "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference | paste -sd' ')
   gov=$(sort -u "$CPU"/cpu[0-9]*/cpufreq/scaling_governor | paste -sd' ')
-  chk "Turbo ${turbo:-?} (profile: $saved_turbo)" test "$turbo" = "$saved_turbo"
-  chk "Governor $gov on every core"            test "$gov" = powersave
-  chk "EPP $epp on every core"                 test "$bad" -eq 0
+  # No saved profile (after --uninstall): nothing to compare, and an empty value would match an empty one.
+  if [[ -z $saved_turbo || -z $saved_epp ]]; then
+    ko "No saved profile ($CONF)"
+    chk "Governor $gov on every core"          test "$gov" = powersave
+  else
+    chk "Turbo ${turbo:-?} (profile: $saved_turbo)" test "$turbo" = "$saved_turbo"
+    chk "Governor $gov on every core"          test "$gov" = powersave
+    chk "EPP $epp on every core"               test "$bad" -eq 0
+  fi
   chk "No refused write since boot"            bash -c "! journalctl -u cpu-powersave -b --no-pager -o cat | grep -q failed"
   pl1=$(rapl_w 0) pl2=$(rapl_w 1)
   if [[ -z $HL_CPU_PL1$HL_CPU_PL2 ]]; then
