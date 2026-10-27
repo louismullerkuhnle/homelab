@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/i
 | --------------- | -------------------------------------------------------------------------- |
 | `--check`       | checks without changing anything; exit code 0 or 1                         |
 | `--reconfigure` | asks the questions again                                                   |
-| `--uninstall`   | undoes the procedure and removes its settings, when supported (see the guide) |
+| `--uninstall`   | undoes the procedure and removes its settings; every script but `vm/init`  |
 
 Pass an option like this: `curl … | sudo bash -s -- --check`. On the Proxmox host you are root: no `sudo`.
 

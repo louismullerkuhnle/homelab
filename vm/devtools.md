@@ -20,7 +20,7 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/d
 
 On first run, the script asks for the list of tools (default: `node@lts bun@latest python@latest uv@latest`) and whether to install Claude Code. Log in again afterwards to enable mise, then run `claude` to authenticate.
 
-> Change the tools: run again with `--reconfigure`. Check: `--check`.
+> Change the tools: run again with `--reconfigure`. Check: `--check`. Undo: `--uninstall`, which asks separately whether to delete the Claude Code and gh logins.
 
 ## Manual
 
@@ -91,7 +91,24 @@ Proxmox: VM → **Snapshots** → **Take Snapshot**, name `devtools`; then start
 
 ## Undo
 
-Restore the `docker` snapshot (or `config` if Docker is not installed).
+```bash
+curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/devtools.sh | sudo bash -s -- --uninstall
+```
+
+By hand:
+
+```bash
+rm -rf ~/.local/share/mise ~/.local/state/mise ~/.config/mise ~/.cache/mise ~/.local/bin/claude ~/.local/share/claude
+nano ~/.bashrc                                                                        # remove the mise activate lines
+sudo apt purge -y mise gh
+sudo rm -f /etc/apt/sources.list.d/{mise,github-cli}.sources /etc/apt/keyrings/{mise.asc,githubcli.gpg}
+sudo apt-mark auto build-essential pkg-config jq ripgrep fd-find unzip && sudo apt autoremove --purge -y
+rm -rf ~/.claude ~/.claude.json ~/.config/gh                                          # optional: logins and settings
+```
+
+> `apt-mark auto`: the build tools are removed only if no other package needs them. `autoremove` also removes any other package no longer needed.
+>
+> Or restore the `docker` snapshot (`config` if Docker is not installed).
 
 ## Notes
 

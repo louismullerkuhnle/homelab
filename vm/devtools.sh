@@ -3,6 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/devtools.sh | sudo bash
 #   … | sudo bash -s -- --check          check            … | sudo bash -s -- --reconfigure   change the tools
+#   … | sudo bash -s -- --uninstall      undo
 #
 # Guide: vm/devtools.md · Requires: vm/init
 # shellcheck disable=SC2329  # steps called by run_steps
@@ -134,31 +135,76 @@ check() {
   if (( ${#tools[@]} )); then note "$( { as_user mise current 2>/dev/null || true; } | paste -sd' ' | sed 's/ \([a-z]\)/ · \1/g')"; fi
 }
 
+uninstall() {
+  step "Uninstall"
+  local p pkgs=() build=()
+  confirm "Remove mise and its tools, gh and Claude Code for $HL_USER?" || die "cancelled, nothing changed"
+  # Paths from the mise and Claude Code docs.
+  rm -rf "$HL_HOME"/.local/share/mise "$HL_HOME"/.local/state/mise "$HL_HOME"/.config/mise "$HL_HOME"/.cache/mise \
+         "$HL_HOME"/.local/bin/claude "$HL_HOME"/.local/share/claude
+  ok "Languages, tools and Claude Code removed from $HL_HOME"
+  # The block written by step_tools, with its leading blank line.
+  # shellcheck disable=SC2016  # $(…) is the literal text in .bashrc
+  sed -z -i 's/\n# Tools installed by mise\neval "\$(mise activate bash)"\n//' "$HL_HOME/.bashrc" 2>/dev/null || true
+  if grep -qF 'mise activate bash' "$HL_HOME/.bashrc" 2>/dev/null; then
+    warn "mise still enabled in ~/.bashrc (line edited by hand): remove it"
+  else
+    ok "mise removed from ~/.bashrc"
+  fi
+  for p in mise gh; do if is_installed "$p"; then pkgs+=("$p"); fi; done
+  if (( ${#pkgs[@]} )); then run "Removing ${pkgs[*]}" "${APT[@]}" purge "${pkgs[@]}"; fi
+  rm -f /etc/apt/sources.list.d/{mise,github-cli}.sources /etc/apt/keyrings/{mise.asc,githubcli.gpg}
+  ok "Repositories and keys removed"
+  # Marked as automatic: apt removes them only if no other package depends on or recommends them.
+  for p in "${PACKAGES[@]}"; do if is_installed "$p"; then build+=("$p"); fi; done
+  if (( ${#build[@]} )); then
+    run "Build tools marked as removable" apt-mark auto "${build[@]}"
+    run "Removing unused packages" "${APT[@]}" autoremove --purge
+  fi
+  # Asked separately: logins are not recreated by a reinstall.
+  if confirm "Also delete the logins and settings of Claude Code and gh (~/.claude, ~/.claude.json, ~/.config/gh)?"; then
+    rm -rf "$HL_HOME/.claude" "$HL_HOME/.claude.json" "$HL_HOME/.config/gh"
+    ok "Logins and settings deleted"
+  else
+    ok "Logins and settings kept"
+  fi
+  conf_unset HL_DEV_TOOLS HL_DEV_CLAUDE
+  ok "Settings removed from $HL_CONF"
+}
+
 main() {
   local mode=install a
   for a in "$@"; do
     case $a in
       --check)       mode=check ASK=0 ;;
+      --uninstall)   mode=uninstall ;;
       --reconfigure) RECONFIGURE=1 ;;
-      *)             die "unknown option: $a (--check, --reconfigure)" ;;
+      *)             die "unknown option: $a (--check, --uninstall, --reconfigure)" ;;
     esac
   done
   start vm/devtools "Development tools"
   require_ubuntu 26.04
 
-  if [[ $mode == check ]]; then
-    settings
-    check
-    finish "Compliant"
-  else
-    require_done vm/init
-    run_steps step_settings step_packages step_repos step_install step_tools step_claude check
-    mark_done
-    finish "Done"
-    next_steps "Log out and back in, then run claude to authenticate" \
-               "Check: curl -fsSL $HL_RAW/vm/devtools.sh | sudo bash -s -- --check" \
-               "Snapshot: sudo poweroff, then Proxmox → Snapshots → Take Snapshot \"devtools\", then start the VM"
-  fi
+  case $mode in
+    check)
+      settings
+      check
+      finish "Compliant" ;;
+    uninstall)
+      settings
+      uninstall
+      mark_undone
+      finish "Uninstalled"
+      next_steps "Log out and back in: mise leaves the shell" ;;
+    install)
+      require_done vm/init
+      run_steps step_settings step_packages step_repos step_install step_tools step_claude check
+      mark_done
+      finish "Done"
+      next_steps "Log out and back in, then run claude to authenticate" \
+                 "Check: curl -fsSL $HL_RAW/vm/devtools.sh | sudo bash -s -- --check" \
+                 "Snapshot: sudo poweroff, then Proxmox → Snapshots → Take Snapshot \"devtools\", then start the VM" ;;
+  esac
   hl_exit
 }
 

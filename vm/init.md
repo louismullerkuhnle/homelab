@@ -148,6 +148,10 @@ sudo poweroff
 
 Proxmox: VM → **Snapshots** → **Take Snapshot**, name `config`; then start the VM.
 
+## Undo
+
+Restore the `install` snapshot. No `--uninstall`: system updates and the extended disk cannot be undone, and undoing the rest would re-enable SSH password login.
+
 ## Notes
 
 - **Remount the share** after an outage: `sudo mount /mnt/share`.
