@@ -150,6 +150,7 @@ conf_set() {
 }
 
 # setting <VAR> <question> <default> [<regex>]: answering "-" clears the value.
+# The question reads "Label (hint)"; the chosen value is then shown as "✓ Label: value".
 setting() {
   local var=$1 question=$2 default=$3 re=${4:-} value
   if [[ -n ${!var+x} ]]; then
@@ -170,7 +171,10 @@ setting() {
   fi
   [[ -z $re || $value =~ $re ]] || die "invalid $var: $value"
   printf -v "$var" '%s' "$value"
-  if (( ASK )); then conf_set "$var" "$value"; fi
+  if (( ASK )); then
+    conf_set "$var" "$value"
+    ok "${question%% (*}: ${value:-none}"
+  fi
 }
 
 # --- Helpers -----------------------------------------------------------------------------------------
@@ -178,7 +182,7 @@ setting() {
 # With `curl | bash`, stdin is the script itself: answers are read from /dev/tty.
 has_tty() { { : </dev/tty; } 2>/dev/null; }
 
-# ask / ask_secret <variable> <question>: the input line is cleared afterwards.
+# ask / ask_secret <variable> <question>: the input line is cleared afterwards, the caller shows the result.
 ask() {
   local __answer
   has_tty || die "input required: run from a terminal (ssh -t)"
@@ -186,12 +190,25 @@ ask() {
   if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
   printf -v "$1" '%s' "$__answer"
 }
+# One * per typed character, capped so that the line never wraps; Backspace works.
 ask_secret() {
-  local __answer
+  local __answer='' __c
   has_tty || die "input required: run from a terminal (ssh -t)"
-  read -rsp "  $2: " __answer </dev/tty
-  echo >&2
-  if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
+  printf '  %s: ' "$2" >&2
+  while IFS= read -rsn1 __c </dev/tty; do
+    case $__c in
+      '') break ;;
+      $'\x7f'|$'\b')
+        if [[ -n $__answer ]]; then
+          if (( ${#__answer} <= 24 )); then printf '\b \b' >&2; fi
+          __answer=${__answer%?}
+        fi ;;
+      *)
+        __answer+=$__c
+        if (( ${#__answer} <= 24 )); then printf '*' >&2; fi ;;
+    esac
+  done
+  if (( TTY )); then printf '\r\033[2K' >&2; else echo >&2; fi
   printf -v "$1" '%s' "$__answer"
 }
 confirm() {

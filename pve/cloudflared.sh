@@ -34,14 +34,14 @@ NEW_TOKEN=0
 CHANGED=0
 
 settings() {
-  setting HL_PVE_HOSTNAME "Public name of the web UI, e.g. pve.example.com (- to skip the check)" "" '^([a-z0-9-]+\.)+[a-z]{2,}$|^$'
+  setting HL_PVE_HOSTNAME "Public name of the web UI (e.g. pve.example.com, - to skip the check)" "" '^([a-z0-9-]+\.)+[a-z]{2,}$|^$'
 }
 
 # The token is asked first so the rest runs unattended.
 step_settings() {
   step "Settings and token"
   settings
-  if [[ -n $HL_PVE_HOSTNAME ]]; then ok "Public name $HL_PVE_HOSTNAME"; else skip "no public name: Access will not be checked"; fi
+  if [[ -z $HL_PVE_HOSTNAME ]]; then note "no public name: Access will not be checked"; fi
 
   if [[ -s $ENV_FILE && $NEW_TOKEN == 0 ]]; then
     ok "Existing token reused ($ENV_FILE)"
@@ -49,7 +49,8 @@ step_settings() {
     return
   fi
   local raw json token tunnel_id
-  ask_secret raw "Tunnel token, or the \"cloudflared service install …\" command from the dashboard"
+  ask_secret raw "Tunnel token (or the full install command)"
+  ok "Tunnel token: ********"
   # Accepts the token alone or the full command.
   [[ $raw =~ (eyJ[A-Za-z0-9+/_=-]{50,}) ]] || die "no token found (it starts with eyJ)"
   token=${BASH_REMATCH[1]}

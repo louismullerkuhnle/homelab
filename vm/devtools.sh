@@ -28,9 +28,9 @@ GH_KEY_FPRS=(2C6106201985B60E6C7AC87323F3D4EA75716059 7F38BBB59D064DBCB3D84D7256
 CLAUDE_INSTALLER=https://claude.ai/install.sh
 
 settings() {
-  setting HL_USER       "Main user"                         "${SUDO_USER:-}"                              '^[a-z_][a-z0-9_-]*$'
-  setting HL_DEV_TOOLS  "mise tools (- for none)"           "node@lts bun@latest python@latest uv@latest" '^[a-z0-9@._ /-]*$'
-  setting HL_DEV_CLAUDE "Install Claude Code: yes or no"    yes                                           '^(yes|no)$'
+  setting HL_USER       "Main user"                          "${SUDO_USER:-}"                              '^[a-z_][a-z0-9_-]*$'
+  setting HL_DEV_TOOLS  "mise tools (- for none)"            "node@lts bun@latest python@latest uv@latest" '^[a-z0-9@._ /-]*$'
+  setting HL_DEV_CLAUDE "Install Claude Code (yes or no)"    yes                                           '^(yes|no)$'
   [[ $HL_USER != root ]] || die "HL_USER cannot be root"
   id "$HL_USER" &>/dev/null || die "user $HL_USER does not exist"
   HL_GROUP=$(id -gn "$HL_USER")
@@ -43,7 +43,6 @@ as_user() { sudo -H -u "$HL_USER" env MISE_YES=1 "$@"; }
 step_settings() {
   step "Settings"
   settings
-  ok "User $HL_USER · tools ${HL_DEV_TOOLS:-none} · Claude Code $HL_DEV_CLAUDE"
   note "saved in $HL_CONF; --reconfigure to change them"
 }
 

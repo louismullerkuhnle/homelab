@@ -161,14 +161,14 @@ require_intel_pstate() {
 
 # BIOS limits are saved so that --check spots a BIOS reset. Default: current values.
 settings() {
-  setting HL_CPU_PL1 "Expected BIOS PL1 limit, in W (- to skip the check)" "$(rapl_w 0)" '^[0-9]*$'
-  setting HL_CPU_PL2 "Expected BIOS PL2 limit, in W (- to skip the check)" "$(rapl_w 1)" '^[0-9]*$'
+  setting HL_CPU_PL1 "Expected BIOS PL1 limit in W (- to skip the check)" "$(rapl_w 0)" '^[0-9]*$'
+  setting HL_CPU_PL2 "Expected BIOS PL2 limit in W (- to skip the check)" "$(rapl_w 1)" '^[0-9]*$'
 }
 
 step_settings() {
   step "Settings"
   settings
-  if [[ -n $HL_CPU_PL1$HL_CPU_PL2 ]]; then ok "Expected limits: PL1 ${HL_CPU_PL1:-?} W, PL2 ${HL_CPU_PL2:-?} W"; else skip "BIOS limits not checked"; fi
+  if [[ -z $HL_CPU_PL1$HL_CPU_PL2 ]]; then note "BIOS limits will not be checked"; fi
 }
 
 # TLP, tuned and power-profiles-daemon write the same settings: the last writer wins.

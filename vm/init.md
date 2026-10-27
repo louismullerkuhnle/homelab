@@ -14,7 +14,7 @@ Updates, base tools, QEMU guest agent, automatic security updates, extended disk
 curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/init.sh | sudo bash
 ```
 
-On first run, the script asks for the main user, timezone, NAS share (and its credentials), NAS access mode and IPv6. Answers are saved in `/etc/homelab.conf`.
+On first run, the script asks for the main user, timezone, SSH keys to import, NAS share (and its credentials), NAS access mode and IPv6. Each answer stays on screen, passwords as `*`. Answers are saved in `/etc/homelab.conf`.
 
 ```bash
 sudo reboot

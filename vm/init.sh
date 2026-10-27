@@ -34,15 +34,15 @@ NEED_REBOOT=0
 current_tz() { timedatectl show -p Timezone --value 2>/dev/null || true; }
 
 settings() {
-  setting HL_USER            "Main user"                                          "${SUDO_USER:-}"   '^[a-z_][a-z0-9_-]*$'
+  setting HL_USER            "Main user"                                          "${SUDO_USER:-}"  '^[a-z_][a-z0-9_-]*$'
   setting HL_TIMEZONE        "Timezone"                                           "$(current_tz)"
-  setting HL_SSH_GITHUB_USER "GitHub account to import SSH keys from (- for none)" ""                '^[A-Za-z0-9-]*$'
-  setting HL_NAS_SHARE       "NAS share, e.g. //192.168.1.10/share (- for none)"  ""                '^(//[^ ]+)?$'
+  setting HL_SSH_GITHUB_USER "SSH keys from GitHub account (- to skip)"           ""                '^[A-Za-z0-9-]*$'
+  setting HL_NAS_SHARE       "NAS share (e.g. //192.168.1.10/share, - for none)"  ""                '^(//[^ ]+)?$'
   if [[ -n $HL_NAS_SHARE ]]; then
-    setting HL_NAS_MODE      "NAS access: rw or ro"                               rw                '^(rw|ro)$'
+    setting HL_NAS_MODE      "NAS access (rw or ro)"                              rw                '^(rw|ro)$'
     setting HL_NAS_MOUNT     "NAS mount point"                                    /mnt/nas          '^/[^ ]+$'
   fi
-  setting HL_IPV6            "IPv6: on or off"                                    on                '^(on|off)$'
+  setting HL_IPV6            "IPv6 (on or off)"                                   on                '^(on|off)$'
   [[ $HL_USER != root ]] || die "HL_USER cannot be root"
   id "$HL_USER" &>/dev/null || die "user $HL_USER does not exist"
   HL_GROUP=$(id -gn "$HL_USER")
@@ -52,21 +52,21 @@ settings() {
 step_settings() {
   step "Settings"
   settings
-  ok "User $HL_USER · timezone $HL_TIMEZONE · IPv6 $HL_IPV6"
-  if [[ -n $HL_NAS_SHARE ]]; then ok "NAS $HL_NAS_SHARE on $HL_NAS_MOUNT ($HL_NAS_MODE)"; else skip "no NAS"; fi
   note "saved in $HL_CONF; --reconfigure to change them"
 
   # Asked now so the rest runs unattended.
   if [[ -n $HL_NAS_SHARE && ! -s $NAS_CRED ]]; then
     local user pass
     ask user "NAS share user"
-    ask_secret pass "Password"
+    ok "NAS share user: $user"
+    ask_secret pass "NAS password"
+    ok "NAS password: ********"
     [[ -n $user && -n $pass ]] || die "empty NAS credentials"
     install -m 600 -o root -g root /dev/null "$NAS_CRED"
     # printf is a builtin: the password shows up neither in ps nor in the shell history.
     printf 'username=%s\npassword=%s\n' "$user" "$pass" >"$NAS_CRED"
     unset pass
-    ok "NAS credentials for $user saved in $NAS_CRED (600 root)"
+    note "credentials saved in $NAS_CRED (600 root)"
   fi
 }
 
