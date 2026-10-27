@@ -121,7 +121,7 @@ step_claude() {
 
 check() {
   step "Checks"
-  local tool tools
+  local tool tools current
   read -ra tools <<<"$HL_DEV_TOOLS"
   chk "mise installed"                    mise --version
   for tool in "${tools[@]}"; do
@@ -132,7 +132,8 @@ check() {
   if [[ $HL_DEV_CLAUDE == yes ]]; then
     chk "Claude Code installed"           as_user "$HL_HOME/.local/bin/claude" --version
   fi
-  if (( ${#tools[@]} )); then note "$( { as_user mise current 2>/dev/null || true; } | paste -sd' ' | sed 's/ \([a-z]\)/ · \1/g')"; fi
+  current=$( { as_user mise current 2>/dev/null || true; } | paste -sd' ' | sed 's/ \([a-z]\)/ · \1/g')
+  if [[ -n $current ]]; then note "$current"; fi
 }
 
 uninstall() {
@@ -173,7 +174,7 @@ uninstall() {
 }
 
 main() {
-  local mode=install a
+  local mode=install a relog
   for a in "$@"; do
     case $a in
       --check)       mode=check ASK=0 ;;
@@ -201,7 +202,9 @@ main() {
       run_steps step_settings step_packages step_repos step_install step_tools step_claude check
       mark_done
       finish "Done"
-      next_steps "Log out and back in, then run claude to authenticate" \
+      relog="Log out and back in"
+      if [[ $HL_DEV_CLAUDE == yes ]]; then relog+=", then run claude to authenticate"; fi
+      next_steps "$relog" \
                  "Check: curl -fsSL $HL_RAW/vm/devtools.sh | sudo bash -s -- --check" \
                  "Snapshot: sudo poweroff, then Proxmox → Snapshots → Take Snapshot \"devtools\", then start the VM" ;;
   esac

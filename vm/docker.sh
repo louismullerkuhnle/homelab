@@ -132,7 +132,9 @@ check() {
   chk "docker compose available"         docker compose version
   # Pulled from Docker Hub: also checks container networking and DNS.
   chk "Test container (hello-world)"     bash -c "docker run --rm hello-world && docker rmi hello-world"
-  note "$(docker version --format 'Engine {{.Server.Version}}' 2>/dev/null || true) · compose $(docker compose version --short 2>/dev/null || true)"
+  local engine
+  engine=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
+  if [[ -n $engine ]]; then note "Engine $engine · compose $(docker compose version --short 2>/dev/null || true)"; fi
 }
 
 uninstall() {
