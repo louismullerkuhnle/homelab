@@ -138,12 +138,13 @@ check() {
 
 uninstall() {
   step "Uninstall"
-  local p pkgs=() build=()
-  confirm "Remove mise and its tools, gh and Claude Code for $HL_USER?" || die "cancelled, nothing changed"
+  local p pkgs=() build=() logins=() claude=0 what="mise and its tools and gh"
+  if [[ -e $HL_HOME/.local/bin/claude || -e $HL_HOME/.local/share/claude ]]; then claude=1 what="mise and its tools, gh and Claude Code"; fi
+  confirm "Remove $what for $HL_USER?" || die "cancelled, nothing changed"
   # Paths from the mise and Claude Code docs.
   rm -rf "$HL_HOME"/.local/share/mise "$HL_HOME"/.local/state/mise "$HL_HOME"/.config/mise "$HL_HOME"/.cache/mise \
          "$HL_HOME"/.local/bin/claude "$HL_HOME"/.local/share/claude
-  ok "Languages, tools and Claude Code removed from $HL_HOME"
+  if (( claude )); then ok "Languages, tools and Claude Code removed from $HL_HOME"; else ok "Languages and tools removed from $HL_HOME"; fi
   # The block written by step_tools, with its leading blank line.
   # shellcheck disable=SC2016  # $(…) is the literal text in .bashrc
   sed -z -i 's/\n# Tools installed by mise\neval "\$(mise activate bash)"\n//' "$HL_HOME/.bashrc" 2>/dev/null || true
@@ -162,12 +163,15 @@ uninstall() {
     run "Build tools marked as removable" apt-mark auto "${build[@]}"
     run "Removing unused packages" "${APT[@]}" autoremove --purge
   fi
-  # Asked separately: logins are not recreated by a reinstall.
-  if confirm "Also delete the logins and settings of Claude Code and gh (~/.claude, ~/.claude.json, ~/.config/gh)?"; then
-    rm -rf "$HL_HOME/.claude" "$HL_HOME/.claude.json" "$HL_HOME/.config/gh"
-    ok "Logins and settings deleted"
-  else
-    ok "Logins and settings kept"
+  # Asked separately, and only for what exists: logins are not recreated by a reinstall.
+  for p in .claude .claude.json .config/gh; do if [[ -e $HL_HOME/$p ]]; then logins+=("$HL_HOME/$p"); fi; done
+  if (( ${#logins[@]} )); then
+    if confirm "Also delete the logins and settings (${logins[*]})?"; then
+      rm -rf "${logins[@]}"
+      ok "Logins and settings deleted"
+    else
+      ok "Logins and settings kept"
+    fi
   fi
   conf_unset HL_DEV_TOOLS HL_DEV_CLAUDE
   ok "Settings removed from $HL_CONF"
