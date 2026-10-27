@@ -110,8 +110,10 @@ In the tunnel → **Published application routes** → **Add**:
 
 ```bash
 journalctl -u cloudflared -n 20 --no-pager                                            # "Registered tunnel connection" x4
-curl -sI https://<public name> | grep -i '^location'                                  # → https://<team>.cloudflareaccess.com/…
+curl -sI --doh-url https://cloudflare-dns.com/dns-query https://<public name> | grep -i '^location'   # → https://<team>.cloudflareaccess.com/…
 ```
+
+> `--doh-url`: on Proxmox, `/etc/hosts` maps the host's own name to its LAN IP; public DNS goes through the tunnel instead. Same check from the workstation: plain `curl -sI`. A `200` without `location`: no Access application, or a bypass rule for your IP.
 
 > No redirect to `cloudflareaccess.com`: Access protects nothing.
 

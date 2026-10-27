@@ -148,7 +148,7 @@ wait_connections() {
 
 check() {
   step "Checks"
-  local code loc
+  local code loc err
   chk "cloudflared running"            systemctl is-active --quiet cloudflared
   chk "cloudflared enabled at boot"    systemctl is-enabled --quiet cloudflared
   chk "Token file 600 root"            test "$(stat -c '%a %U' "$ENV_FILE" 2>/dev/null || true)" = "600 root"
@@ -159,17 +159,22 @@ check() {
     note "journalctl -u cloudflared -n 50"
   fi
   if [[ -z $HL_PVE_HOSTNAME ]]; then skip "Access not checked (no public name)"; return; fi
-  chk "DNS $HL_PVE_HOSTNAME"           getent hosts "$HL_PVE_HOSTNAME"
+  # Resolved through public DNS over HTTPS: /etc/hosts maps the host's own FQDN to its LAN IP,
+  # which would test Proxmox directly instead of the tunnel.
+  IFS='|' read -r code loc err < <(curl -s -o /dev/null --max-time 15 --doh-url https://cloudflare-dns.com/dns-query \
+    -w '%{http_code}|%{redirect_url}|%{errormsg}\n' "https://$HL_PVE_HOSTNAME/" || true) || true
   # Without a session, Access must redirect to <team>.cloudflareaccess.com before reaching Proxmox.
-  read -r code loc < <(curl -s -o /dev/null --max-time 15 -w '%{http_code} %{redirect_url}\n' "https://$HL_PVE_HOSTNAME/" || echo "000 -")
   if [[ $code == 30[12378] && $loc == *cloudflareaccess.com* ]]; then
     ok "Access protects $HL_PVE_HOSTNAME"
   elif [[ $code == 200 ]]; then
-    ko "$HL_PVE_HOSTNAME answers without authentication: Access PROTECTS NOTHING"
-    note "create the Access application (guide, step 4)"
-  else
-    ko "$HL_PVE_HOSTNAME unreachable (HTTP $code)"
+    warn "$HL_PVE_HOSTNAME answers without login from this network: no Access application, or a bypass rule for this IP"
+    note "check from another network (mobile data): the Access page must show up (guide, step 4)"
+  elif [[ ${code:-000} == 000 ]]; then
+    ko "$HL_PVE_HOSTNAME unreachable: ${err:-no answer}"
     note "route published? (guide, step 5)"
+  else
+    ko "$HL_PVE_HOSTNAME answers HTTP $code"
+    note "route to https://localhost:8006 with No TLS Verify? (guide, step 5)"
   fi
 }
 
@@ -215,7 +220,7 @@ main() {
       mark_done
       finish "Done"
       if (( FAILS )); then
-        note "expected until the Access application and the route are created in the dashboard"
+        note "expected if the Access application and the route are not created yet in the dashboard"
         next_steps "Do steps 4 and 5 of the pve/cloudflared.md guide" "Run again with --check"
       elif [[ -n $HL_PVE_HOSTNAME ]]; then
         next_steps "Open https://$HL_PVE_HOSTNAME in a private window: Access page, then Proxmox login"
