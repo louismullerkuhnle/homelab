@@ -23,11 +23,11 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/pve/
 
 The script asks for the public name, then for the token as hidden input (the token alone or the whole command copied from the dashboard). It shows the tunnel ID read from the token: check in the dashboard that it is the right one.
 
-| Option        | Effect                                                              |
-| ------------- | ------------------------------------------------------------------- |
+| Option        | Effect                                                                |
+| ------------- | --------------------------------------------------------------------- |
 | `--check`     | checks the service, the connections, and that Access protects the URL |
-| `--new-token` | replaces the token                                                  |
-| `--uninstall` | stops the tunnel and removes `cloudflared`                          |
+| `--new-token` | replaces the token                                                    |
+| `--uninstall` | stops the tunnel, removes `cloudflared`, its token and its setting    |
 
 Usage: `curl … | bash -s -- --check`.
 

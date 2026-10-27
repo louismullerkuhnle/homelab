@@ -150,6 +150,12 @@ conf_set() {
   { grep -av "^$1=" "$HL_CONF" || true; printf '%s=%s\n' "$1" "$2"; } >"$TMP/conf"
   install -m 644 -o root -g root "$TMP/conf" "$HL_CONF"
 }
+# conf_unset <name>...: removes settings on --uninstall; only those no other script uses.
+conf_unset() {
+  [[ -f $HL_CONF ]] || return 0
+  { grep -avE "^($(IFS='|'; echo "$*"))=" "$HL_CONF" || true; } >"$TMP/conf"
+  install -m 644 -o root -g root "$TMP/conf" "$HL_CONF"
+}
 
 # is_valid <value> <rule>: printable UTF-8 text, then the rule, a regex or @function for what a regex cannot check.
 is_valid() {

@@ -367,7 +367,8 @@ uninstall() {
   systemctl disable --now cpu-powersave.service >>"$LOG" 2>&1 || true
   rm -f "$UNIT" "$BIN" "$CONF"
   systemctl daemon-reload
-  ok "Command, profile and service removed"
+  conf_unset HL_CPU_PL1 HL_CPU_PL2
+  ok "Command, profile, service and settings removed"
   if turbo_on; then ok "Turbo re-enabled"; else warn "turbo not re-enabled"; fi
   for f in "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference; do
     echo balance_performance >"$f" 2>/dev/null || warn "EPP not restored on $f"

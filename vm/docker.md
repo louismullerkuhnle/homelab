@@ -14,7 +14,7 @@ Docker Engine from Docker's official APT repository, with log rotation and acces
 curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/docker.sh | sudo bash
 ```
 
-Log in again afterwards to use `docker` without `sudo`. Check with `… | sudo bash -s -- --check`, undo with `--uninstall` (data in `/var/lib/docker` is kept).
+Log in again afterwards to use `docker` without `sudo`. Check with `… | sudo bash -s -- --check`, undo with `--uninstall`, which asks separately whether to delete images, containers and volumes.
 
 > The script stops before changing anything if the key fingerprint differs, if Docker does not publish for this Ubuntu release yet, or if conflicting packages (`docker.io`, `containerd`, `runc`…) are installed. A hand-edited `daemon.json` is never overwritten.
 
@@ -100,9 +100,11 @@ Proxmox: VM → **Snapshots** → **Take Snapshot**, name `docker`; then start t
 sudo apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras
 sudo rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc
 sudo rm -rf /etc/docker
+sudo groupdel docker
+sudo rm -rf /var/lib/docker /var/lib/containerd                                       # optional: images, containers, volumes
 ```
 
-> Images, volumes and containers stay in `/var/lib/docker` and `/var/lib/containerd`.
+> Without the last line, images, containers and volumes stay in `/var/lib/docker` and `/var/lib/containerd`.
 
 ## Notes
 

@@ -137,12 +137,19 @@ check() {
 
 uninstall() {
   step "Uninstall"
-  confirm "Remove Docker? Containers stopped, data kept." || die "cancelled, nothing changed"
+  confirm "Remove Docker? Containers are stopped." || die "cancelled, nothing changed"
   run "Removing packages" "${APT[@]}" purge "${PACKAGES[@]}" docker-ce-rootless-extras
   rm -f "$SOURCES" "$KEYRING"
   rm -rf /etc/docker
   ok "Repository, key and configuration removed"
-  note "data kept: /var/lib/docker and /var/lib/containerd"
+  if getent group docker >/dev/null; then run "Removing the docker group" groupdel docker; fi
+  # Asked separately: images and volumes may hold data that exists nowhere else.
+  if confirm "Also delete images, containers and volumes (/var/lib/docker, /var/lib/containerd)?"; then
+    rm -rf /var/lib/docker /var/lib/containerd
+    ok "Images, containers and volumes deleted"
+  else
+    ok "Data kept: /var/lib/docker, /var/lib/containerd"
+  fi
 }
 
 main() {

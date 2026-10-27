@@ -185,7 +185,8 @@ uninstall() {
   rm -f "$UNIT"
   rm -rf "$ENV_DIR"
   systemctl daemon-reload
-  ok "Service and token removed"
+  conf_unset HL_PVE_HOSTNAME
+  ok "Service, token and setting removed"
   if is_installed cloudflared; then run "Removing the package" "${APT[@]}" purge cloudflared; fi
   rm -f "$SOURCES" "$KEYRING"
   ok "Repository and key removed"
