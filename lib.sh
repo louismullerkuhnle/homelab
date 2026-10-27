@@ -89,13 +89,19 @@ finish() {
 # --- Lifecycle ---------------------------------------------------------------------------------------
 
 TMP=$(mktemp -d)
+HL_STTY=''
+# Terminal settings saved by ask_secret. On Ctrl-C, restored by the EXIT trap: earlier, read would
+# put back its own settings (echo off) on the way out.
+tty_restore() {
+  if [[ -n $HL_STTY ]]; then stty "$HL_STTY" </dev/tty 2>/dev/null || true; HL_STTY=''; fi
+}
 on_int() {
   printf '%s\n' "$CLR" >&2
   if [[ -n $RUN_PID ]]; then warn "interrupted: the running command (pid $RUN_PID) keeps going in the background"; fi
   exit 130
 }
 trap on_int INT
-trap 'rm -rf "$TMP"' EXIT
+trap 'tty_restore; rm -rf "$TMP"' EXIT
 trap 'die "failed at line $LINENO: $BASH_COMMAND"' ERR
 
 # start <folder/name> <title>: root, log, header.
@@ -233,6 +239,9 @@ ask_secret() {
   has_tty || die "input required: run from a terminal (ssh -t)"
   __cols=$(tty_cols)
   __max=$(( __cols - ${#__prompt} - 1 ))
+  # Echo off for the whole input: read -s turns it back on between characters, so a paste showed in clear.
+  HL_STTY=$(stty -g </dev/tty 2>/dev/null || true)
+  stty -echo </dev/tty 2>/dev/null || true
   printf '%s' "$__prompt" >&2
   while IFS= read -rsn1 __c </dev/tty; do
     case $__c in
@@ -247,6 +256,7 @@ ask_secret() {
         if (( ${#__answer} <= __max )); then printf '*' >&2; fi ;;
     esac
   done
+  tty_restore
   if (( TTY )); then printf '\r\033[2K' >&2; else echo >&2; fi
   printf -v "$1" '%s' "$__answer"
 }
