@@ -1,0 +1,45 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Pinned version: the runner's (0.9) names some checks differently than recent releases.
+      - name: install shellcheck 0.11.0
+        env:
+          VERSION: v0.11.0
+          SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+        run: |
+          curl -fsSL -o sc.tar.xz "https://github.com/koalaman/shellcheck/releases/download/$VERSION/shellcheck-$VERSION.linux.x86_64.tar.xz"
+          echo "$SHA256  sc.tar.xz" | sha256sum -c -
+          tar -xJf sc.tar.xz --strip-components=1 -C "$RUNNER_TEMP" "shellcheck-$VERSION/shellcheck"
+          echo "$RUNNER_TEMP" >>"$GITHUB_PATH"
+
+      - name: shellcheck
+        run: |
+          shellcheck -x lib.sh ./*/*.sh
+          # Command embedded in pve/cpu-powersave.sh.
+          sed -n "/<<'TOOL'/,/^TOOL$/{//!p}" pve/cpu-powersave.sh | shellcheck -s bash -e SC1090 -
+
+      - name: guide links
+        run: |
+          fail=0
+          for md in $(git ls-files '*.md'); do
+            dir=$(dirname "$md")
+            while IFS= read -r link; do
+              target=${link%%#*}
+              [[ -z $target || $target =~ ^(https?|mailto): ]] && continue
+              if [[ ! -e $dir/$target ]]; then echo "::error file=$md::broken link: $link"; fail=1; fi
+            done < <(grep -oE '\]\([^)]+\)' "$md" | sed -E 's/^\]\((.*)\)$/\1/')
+          done
+          exit "$fail"
