@@ -29,7 +29,7 @@ CLAUDE_INSTALLER=https://claude.ai/install.sh
 
 settings() {
   setting HL_USER       "Main user"                          "${SUDO_USER:-}"                              '^[a-z_][a-z0-9_-]*$'
-  setting HL_DEV_TOOLS  "mise tools (- for none)"            "node@lts bun@latest python@latest uv@latest" '^[a-z0-9@._ /-]*$'
+  setting HL_DEV_TOOLS  "mise tools (empty for none)"        "node@lts bun@latest python@latest uv@latest" '^[a-z0-9@._ /-]*$'
   setting HL_DEV_CLAUDE "Install Claude Code (yes or no)"    yes                                           '^(yes|no)$'
   [[ $HL_USER != root ]] || die "HL_USER cannot be root"
   id "$HL_USER" &>/dev/null || die "user $HL_USER does not exist"

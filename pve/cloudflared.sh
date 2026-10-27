@@ -34,7 +34,7 @@ NEW_TOKEN=0
 CHANGED=0
 
 settings() {
-  setting HL_PVE_HOSTNAME "Public name of the web UI (e.g. pve.example.com, - to skip the check)" "" '^([a-z0-9-]+\.)+[a-z]{2,}$|^$'
+  setting HL_PVE_HOSTNAME "Public name of the web UI (e.g. pve.example.com, empty to skip the check)" "" '^([a-z0-9-]+\.)+[a-z]{2,}$|^$'
 }
 
 # The token is asked first so the rest runs unattended.

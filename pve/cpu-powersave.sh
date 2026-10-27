@@ -161,8 +161,8 @@ require_intel_pstate() {
 
 # BIOS limits are saved so that --check spots a BIOS reset. Default: current values.
 settings() {
-  setting HL_CPU_PL1 "Expected BIOS PL1 limit in W (- to skip the check)" "$(rapl_w 0)" '^[0-9]*$'
-  setting HL_CPU_PL2 "Expected BIOS PL2 limit in W (- to skip the check)" "$(rapl_w 1)" '^[0-9]*$'
+  setting HL_CPU_PL1 "Expected BIOS PL1 limit in W (empty to skip the check)" "$(rapl_w 0)" '^[0-9]*$'
+  setting HL_CPU_PL2 "Expected BIOS PL2 limit in W (empty to skip the check)" "$(rapl_w 1)" '^[0-9]*$'
 }
 
 step_settings() {

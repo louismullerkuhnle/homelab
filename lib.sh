@@ -134,25 +134,34 @@ require_pve() {
 }
 
 # --- Settings ----------------------------------------------------------------------------------------
-# Priority: environment variable, then /etc/homelab.conf, then a question (with a proposed default).
+# Priority: environment variable, then /etc/homelab.conf, then a question (with the default pre-filled).
 # The chosen value is saved: the question is asked once, --reconfigure asks again.
 # ASK=0 (--check mode): never asks, uses the default when nothing is saved.
 
 ASK=1 RECONFIGURE=0
 
-conf_has() { [[ -f $HL_CONF ]] && grep -q "^$1=" "$HL_CONF"; }
-conf_get() { grep -m1 "^$1=" "$HL_CONF" | cut -d= -f2-; }
+# -a: a stray byte in the file must not turn grep into "binary file matches".
+conf_has() { [[ -f $HL_CONF ]] && grep -aq "^$1=" "$HL_CONF"; }
+conf_get() { grep -am1 "^$1=" "$HL_CONF" | cut -d= -f2-; }
 conf_set() {
   if conf_has "$1" && [[ $(conf_get "$1") == "$2" ]]; then return 0; fi
   [[ -f $HL_CONF ]] || printf '# Settings of the homelab scripts, saved on first run.\n' >"$HL_CONF"
-  { grep -v "^$1=" "$HL_CONF" || true; printf '%s=%s\n' "$1" "$2"; } >"$TMP/conf"
+  { grep -av "^$1=" "$HL_CONF" || true; printf '%s=%s\n' "$1" "$2"; } >"$TMP/conf"
   install -m 644 -o root -g root "$TMP/conf" "$HL_CONF"
 }
 
-# setting <VAR> <question> <default> [<regex>]: answering "-" clears the value.
-# The question reads "Label (hint)"; the chosen value is then shown as "✓ Label: value".
+# is_valid <value> <rule>: printable UTF-8 text, then the rule, a regex or @function for what a regex cannot check.
+is_valid() {
+  [[ $1 != *[[:cntrl:]]* ]] && iconv -f UTF-8 -t UTF-8 <<<"$1" &>/dev/null || return 1
+  if [[ -z $2 ]]; then return 0; fi
+  if [[ $2 == @* ]]; then "${2#@}" "$1"; else [[ $1 =~ $2 ]]; fi
+}
+
+# setting <VAR> <question> <default> [<rule>]
+# The question reads "Label (hint)", the answer is then shown as "✓ Label: value" at the same place.
+# The default is pre-filled and editable; an empty answer means "none". An invalid answer is asked again.
 setting() {
-  local var=$1 question=$2 default=$3 re=${4:-} value
+  local var=$1 question=$2 default=$3 rule=${4:-} value warned=0
   if [[ -n ${!var+x} ]]; then
     value=${!var}
   elif conf_has "$var" && (( ! RECONFIGURE || ! ASK )); then
@@ -161,15 +170,17 @@ setting() {
     if conf_has "$var"; then default=$(conf_get "$var"); fi
     value=$default
     if (( ASK )) && has_tty; then
+      # A single warning line: replaced on each new attempt, removed once the answer is valid.
       while :; do
-        ask value "$question [${default:-empty}]"
-        if [[ -z $value ]]; then value=$default; elif [[ $value == - ]]; then value=''; fi
-        if [[ -z $re || $value =~ $re ]]; then break; fi
-        warn "rejected value: $value"
+        ask value "$question" "$value"
+        if (( warned && TTY )); then printf '\033[1A\033[2K' >&2; fi
+        if is_valid "$value" "$rule"; then break; fi
+        printf '  %s!%s %s: "%s" is not valid, try again\n' "$YEL" "$RST" "${question%% (*}" "$value" >&2
+        warned=1
       done
     fi
   fi
-  [[ -z $re || $value =~ $re ]] || die "invalid $var: $value"
+  is_valid "$value" "$rule" || die "invalid $var: $value"
   printf -v "$var" '%s' "$value"
   if (( ASK )); then
     conf_set "$var" "$value"
@@ -182,19 +193,20 @@ setting() {
 # With `curl | bash`, stdin is the script itself: answers are read from /dev/tty.
 has_tty() { { : </dev/tty; } 2>/dev/null; }
 
-# ask / ask_secret <variable> <question>: the input line is cleared afterwards, the caller shows the result.
+# ask <variable> <question> [<pre-filled value>]: "  ? question: …" on an editable line (arrows, Backspace),
+# cleared afterwards so that the caller's "  ✓ …" line takes its exact place.
 ask() {
   local __answer
   has_tty || die "input required: run from a terminal (ssh -t)"
-  read -rp "  $2: " __answer </dev/tty
+  IFS= read -e -r -i "${3:-}" -p "  ? $2: " __answer </dev/tty
   if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
   printf -v "$1" '%s' "$__answer"
 }
-# One * per typed character, capped so that the line never wraps; Backspace works.
+# Same, with one * per typed character, capped so that the line never wraps; Backspace works.
 ask_secret() {
   local __answer='' __c
   has_tty || die "input required: run from a terminal (ssh -t)"
-  printf '  %s: ' "$2" >&2
+  printf '  ? %s: ' "$2" >&2
   while IFS= read -rsn1 __c </dev/tty; do
     case $__c in
       '') break ;;

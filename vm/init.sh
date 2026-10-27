@@ -32,17 +32,19 @@ NEED_REBOOT=0
 
 # Current timezone; empty if timedatectl is unavailable, without triggering the error trap.
 current_tz() { timedatectl show -p Timezone --value 2>/dev/null || true; }
+# A timezone is valid if its zoneinfo file exists, e.g. Europe/Paris.
+valid_timezone() { [[ $1 =~ ^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$ && -f /usr/share/zoneinfo/$1 ]]; }
 
 settings() {
-  setting HL_USER            "Main user"                                                    "${SUDO_USER:-}"  '^[a-z_][a-z0-9_-]*$'
-  setting HL_TIMEZONE        "Timezone"                                                     "$(current_tz)"
-  setting HL_SSH_GITHUB_USER "SSH keys from GitHub account (- to skip)"                     ""                '^[A-Za-z0-9-]*$'
-  setting HL_SHARE           "Network share (SMB, e.g. //192.168.1.10/share, - for none)"   ""                '^(//[^ ]+)?$'
+  setting HL_USER            "Main user"                                                       "${SUDO_USER:-}"  '^[a-z_][a-z0-9_-]*$'
+  setting HL_TIMEZONE        "Timezone"                                                        "$(current_tz)"   @valid_timezone
+  setting HL_SSH_GITHUB_USER "SSH keys from GitHub account (empty to skip)"                    ""                '^[A-Za-z0-9-]*$'
+  setting HL_SHARE           "Network share (SMB, e.g. //192.168.1.10/share, empty for none)"  ""                '^(//[^ ]+)?$'
   if [[ -n $HL_SHARE ]]; then
-    setting HL_SHARE_MODE    "Network share access (rw or ro)"                              rw                '^(rw|ro)$'
-    setting HL_SHARE_MOUNT   "Network share mount point"                                    /mnt/share        '^/[^ ]+$'
+    setting HL_SHARE_MODE    "Network share access (rw or ro)"                                 rw                '^(rw|ro)$'
+    setting HL_SHARE_MOUNT   "Network share mount point"                                       /mnt/share        '^/[^ ]+$'
   fi
-  setting HL_IPV6            "IPv6 (on or off)"                                             on                '^(on|off)$'
+  setting HL_IPV6            "IPv6 (on or off)"                                                on                '^(on|off)$'
   [[ $HL_USER != root ]] || die "HL_USER cannot be root"
   id "$HL_USER" &>/dev/null || die "user $HL_USER does not exist"
   HL_GROUP=$(id -gn "$HL_USER")
@@ -115,8 +117,7 @@ step_timezone() {
   if [[ $(current_tz) == "$HL_TIMEZONE" ]]; then
     ok "Already $HL_TIMEZONE"
   else
-    timedatectl set-timezone "$HL_TIMEZONE" || die "unknown timezone: $HL_TIMEZONE (timedatectl list-timezones)"
-    ok "$HL_TIMEZONE"
+    run "Setting $HL_TIMEZONE" timedatectl set-timezone "$HL_TIMEZONE"
   fi
 }
 
