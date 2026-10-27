@@ -17,7 +17,9 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/pve/
 cpu-powersave                                                                         # change profile later
 ```
 
-The script saves the BIOS PL1/PL2 limits: `--check` then reports a BIOS reset. It installs the Balanced profile only if no profile is saved yet, and reports TLP, `tuned` or `power-profiles-daemon` if they are running.
+The script saves the BIOS PL1/PL2 limits: `--check` then reports a BIOS reset. On first run it asks for the profile (`eco`, `balanced`, `performance`, `max`, default `balanced`); a profile already saved, even a custom one, is kept unless `--reconfigure` is passed. It reports TLP, `tuned` or `power-profiles-daemon` if they are running.
+
+> No question: `curl … | env HL_CPU_PROFILE=eco bash`.
 
 Check: `curl … | bash -s -- --check` · undo: `--uninstall`.
 

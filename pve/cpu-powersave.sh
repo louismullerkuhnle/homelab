@@ -3,6 +3,7 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/pve/cpu-powersave.sh | bash
 #   … | bash -s -- --check        check            … | bash -s -- --uninstall     undo
+#   … | bash -s -- --reconfigure  ask the profile and BIOS limits again
 #
 # Installs the cpu-powersave command (profile menu) and its service. The power limit stays in the BIOS.
 # Guide: pve/cpu-powersave.md
@@ -27,6 +28,7 @@ CONF=/etc/cpu-powersave.conf
 UNIT=/etc/systemd/system/cpu-powersave.service
 CPU=/sys/devices/system/cpu
 RAPL=/sys/class/powercap/intel-rapl:0
+PROFILE=''
 
 # Command installed as $BIN.
 tool() {
@@ -165,10 +167,52 @@ settings() {
   setting HL_CPU_PL2 "Expected BIOS PL2 limit in W (none to skip the check)" "$(rapl_w 1)" '^[0-9]*$'
 }
 
+# Profiles of the cpu-powersave menu: name → "TURBO EPP".
+profile_values() {
+  case $1 in
+    eco)         echo "off power" ;;
+    balanced)    echo "off balance_power" ;;
+    performance) echo "on balance_performance" ;;
+    max)         echo "on performance" ;;
+  esac
+}
+# Name of the saved profile: empty if none is saved, custom if it matches no profile.
+saved_profile() {
+  local saved p
+  [[ -f $CONF ]] || return 0
+  # shellcheck source=/dev/null
+  saved=$(. "$CONF" 2>/dev/null && echo "${TURBO:-} ${EPP:-}" || true)
+  for p in eco balanced performance max; do
+    if [[ $saved == "$(profile_values "$p")" ]]; then echo "$p"; return 0; fi
+  done
+  echo custom
+}
+
+# Asked only when no profile is saved yet, or with --reconfigure: a profile chosen with the menu is never overwritten.
+choose_profile() {
+  local saved rule='^(eco|balanced|performance|max)$' hint='eco, balanced, performance, max'
+  saved=$(saved_profile)
+  # custom: the profile saved with the menu matches none of the four, keep it as is.
+  if [[ $saved == custom ]]; then rule='^(eco|balanced|performance|max|custom)$' hint+=', custom'; fi
+  if [[ -n ${HL_CPU_PROFILE:-} ]]; then
+    PROFILE=$HL_CPU_PROFILE
+  elif [[ -n $saved ]] && (( ! RECONFIGURE )); then
+    ok "Profile: $saved (kept; change it with cpu-powersave)"
+    return 0
+  elif has_tty; then
+    prompt PROFILE "Profile ($hint)" "${saved:-balanced}" "$rule"
+  else
+    PROFILE=${saved:-balanced}
+  fi
+  is_valid "$PROFILE" "$rule" || die "invalid profile: $PROFILE ($hint)"
+  ok "Profile: $PROFILE"
+}
+
 step_settings() {
   step "Settings"
   settings
   if [[ -z $HL_CPU_PL1$HL_CPU_PL2 ]]; then note "BIOS limits will not be checked"; fi
+  choose_profile
 }
 
 # TLP, tuned and power-profiles-daemon write the same settings: the last writer wins.
@@ -193,17 +237,18 @@ step_bin() {
 
 step_conf() {
   step "Saved profile"
-  if [[ -f $CONF ]]; then
+  local turbo epp
+  if [[ -z $PROFILE || $PROFILE == custom ]]; then
     ok "Kept: $(grep -E '^(TURBO|EPP)=' "$CONF" | paste -sd' ')"
-    return
+    return 0
   fi
-  # Balanced profile, in the save() format so the menu recognises it.
-  write_if_changed "$CONF" 644 <<'EOF' || true
-# Written by cpu-powersave - change it with the command: cpu-powersave
-TURBO=off
-EPP=balance_power
-EOF
-  ok "Balanced: TURBO=off EPP=balance_power"
+  read -r turbo epp <<<"$(profile_values "$PROFILE")"
+  # Same format as the menu's save(), so that the menu recognises the profile.
+  if write_if_changed "$CONF" 644 <<<"$(printf '# Written by cpu-powersave - change it with the command: cpu-powersave\nTURBO=%s\nEPP=%s' "$turbo" "$epp")"; then
+    ok "$PROFILE: TURBO=$turbo EPP=$epp"
+  else
+    ok "Already $PROFILE: TURBO=$turbo EPP=$epp"
+  fi
 }
 
 step_service() {
@@ -304,7 +349,7 @@ main() {
       run_steps step_settings step_conflicts step_bin step_conf step_service check
       mark_done
       finish "Done"
-      next_steps "Change profile: cpu-powersave" ;;
+      next_steps "Change profile later: cpu-powersave" ;;
   esac
   hl_exit
 }
