@@ -11,7 +11,7 @@ Each procedure has a step-by-step guide (`.md`) and a script (`.sh`) that does t
 | Workstation  | [workstation/ssh](workstation/ssh.md)       | SSH key, machine aliases, key added to the machines   |
 | Proxmox host | [pve/cloudflared](pve/cloudflared.md)       | Web UI through a Cloudflare tunnel, behind Access     |
 | Proxmox host | [pve/cpu-powersave](pve/cpu-powersave.md)   | Intel CPU throttling: turbo, governor, EPP            |
-| VM           | [vm/init](vm/init.md)                       | First boot: system, hardened SSH, disk, NAS           |
+| VM           | [vm/init](vm/init.md)                       | First boot: system, hardened SSH, disk, network share |
 | VM           | [vm/docker](vm/docker.md)                   | Docker Engine, log rotation                           |
 | Dev VM       | [vm/devtools](vm/devtools.md)               | mise (node, bun, python…), GitHub CLI, Claude Code    |
 
@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/i
 
 Pass an option like this: `curl … | sudo bash -s -- --check`. On the Proxmox host you are root: no `sudo`.
 
-**Settings**: on first run, each script asks its questions (user, NAS share…) with a default value, then saves the answers in `/etc/homelab.conf`. An environment variable takes precedence: `curl … | sudo env HL_IPV6=off bash`. Passwords and tokens are typed as hidden input and never leave the machine.
+**Settings**: on first run, each script asks its questions (user, network share…) with a default value, then saves the answers in `/etc/homelab.conf`. An environment variable takes precedence: `curl … | sudo env HL_IPV6=off bash`. Passwords and tokens are typed as hidden input and never leave the machine.
 
 ## Output
 
@@ -50,7 +50,7 @@ One line per action; the full command output goes to `/var/log/homelab/`.
 
 ## Prod and dev
 
-Two separate VMs: prod runs the services (`init`, `docker`); dev is for coding and for agents like Claude Code (`init`, `docker`, `devtools`), with no production secrets and the NAS read-only. A mistake on dev is fixed by restoring a snapshot.
+Two separate VMs: prod runs the services (`init`, `docker`); dev is for coding and for agents like Claude Code (`init`, `docker`, `devtools`), with no production secrets and the network share read-only. A mistake on dev is fixed by restoring a snapshot.
 
 ## Contributing
 

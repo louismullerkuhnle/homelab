@@ -5,7 +5,7 @@ Read `README.md` first. What follows complements it.
 ## Repository
 
 - Everything in English: guides, script output, comments, commits.
-- Public and generic: no personal data (name, email, domain, IP, user). Machine-specific values are asked by `setting` and saved in `/etc/homelab.conf`; in the guides they are written in angle brackets: `<user>`, `<NAS_IP>`, `<public name>`.
+- Public and generic: no personal data (name, email, domain, IP, user). Machine-specific values are asked by `setting` and saved in `/etc/homelab.conf`; in the guides they are written in angle brackets: `<user>`, `<SHARE_IP>`, `<public name>`.
 - No secrets: entered through `ask_secret`, written as `600 root` with `printf`.
 - Minimal tree: `lib.sh` at the root, then `<machine>/<name>.md` + `<machine>/<name>.sh` (`workstation`, `pve`, `vm`), no numbering. No new folder or extra file unless asked: a file installed as is gets embedded in its script.
 

@@ -101,7 +101,7 @@ sudo rm -rf /etc/docker
 ## Notes
 
 - **Projects**: `/srv/<project>/compose.yaml`, `/srv` being owned by the user ([init.md](init.md), step 8).
-- **Data on the NAS**: no database (Postgres, SQLite…) on an SMB share, which handles file locks poorly.
+- **Data on a network share**: no database (Postgres, SQLite…) on an SMB share, which handles file locks poorly.
 - **Disk space**: `docker system df`; `docker builder prune` and `docker image prune -a` to clean up.
 - **IPv6 disabled**: Docker handles it since version 28.0.1; an image that requires IPv6 inside the container will fail.
 - **Firewall**: Docker bypasses `ufw` for published ports. Publish on `127.0.0.1:<PORT>:<PORT>` to keep a service local.

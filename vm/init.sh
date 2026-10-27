@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# First boot of an Ubuntu VM: system, hardened SSH, disk, NAS, IPv6.
+# First boot of an Ubuntu VM: system, hardened SSH, disk, network share, IPv6.
 #
 #   curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/init.sh | sudo bash
 #   … | sudo bash -s -- --check          check            … | sudo bash -s -- --reconfigure   ask the questions again
@@ -22,7 +22,7 @@ else
   rm -f "$lib"
 fi
 
-NAS_CRED=/etc/nas.cred
+SHARE_CRED=/etc/share.cred
 SSH_DROPIN=/etc/ssh/sshd_config.d/10-hardening.conf
 GRUB_DROPIN=/etc/default/grub.d/99-disable-ipv6.cfg
 AUTO_UPGRADES=/etc/apt/apt.conf.d/20auto-upgrades
@@ -34,15 +34,15 @@ NEED_REBOOT=0
 current_tz() { timedatectl show -p Timezone --value 2>/dev/null || true; }
 
 settings() {
-  setting HL_USER            "Main user"                                          "${SUDO_USER:-}"  '^[a-z_][a-z0-9_-]*$'
-  setting HL_TIMEZONE        "Timezone"                                           "$(current_tz)"
-  setting HL_SSH_GITHUB_USER "SSH keys from GitHub account (- to skip)"           ""                '^[A-Za-z0-9-]*$'
-  setting HL_NAS_SHARE       "NAS share (e.g. //192.168.1.10/share, - for none)"  ""                '^(//[^ ]+)?$'
-  if [[ -n $HL_NAS_SHARE ]]; then
-    setting HL_NAS_MODE      "NAS access (rw or ro)"                              rw                '^(rw|ro)$'
-    setting HL_NAS_MOUNT     "NAS mount point"                                    /mnt/nas          '^/[^ ]+$'
+  setting HL_USER            "Main user"                                                    "${SUDO_USER:-}"  '^[a-z_][a-z0-9_-]*$'
+  setting HL_TIMEZONE        "Timezone"                                                     "$(current_tz)"
+  setting HL_SSH_GITHUB_USER "SSH keys from GitHub account (- to skip)"                     ""                '^[A-Za-z0-9-]*$'
+  setting HL_SHARE           "Network share (SMB, e.g. //192.168.1.10/share, - for none)"   ""                '^(//[^ ]+)?$'
+  if [[ -n $HL_SHARE ]]; then
+    setting HL_SHARE_MODE    "Network share access (rw or ro)"                              rw                '^(rw|ro)$'
+    setting HL_SHARE_MOUNT   "Network share mount point"                                    /mnt/share        '^/[^ ]+$'
   fi
-  setting HL_IPV6            "IPv6 (on or off)"                                   on                '^(on|off)$'
+  setting HL_IPV6            "IPv6 (on or off)"                                             on                '^(on|off)$'
   [[ $HL_USER != root ]] || die "HL_USER cannot be root"
   id "$HL_USER" &>/dev/null || die "user $HL_USER does not exist"
   HL_GROUP=$(id -gn "$HL_USER")
@@ -55,18 +55,18 @@ step_settings() {
   note "saved in $HL_CONF; --reconfigure to change them"
 
   # Asked now so the rest runs unattended.
-  if [[ -n $HL_NAS_SHARE && ! -s $NAS_CRED ]]; then
+  if [[ -n $HL_SHARE && ! -s $SHARE_CRED ]]; then
     local user pass
-    ask user "NAS share user"
-    ok "NAS share user: $user"
-    ask_secret pass "NAS password"
-    ok "NAS password: ********"
-    [[ -n $user && -n $pass ]] || die "empty NAS credentials"
-    install -m 600 -o root -g root /dev/null "$NAS_CRED"
+    ask user "Network share user"
+    ok "Network share user: $user"
+    ask_secret pass "Network share password"
+    ok "Network share password: ********"
+    [[ -n $user && -n $pass ]] || die "empty network share credentials"
+    install -m 600 -o root -g root /dev/null "$SHARE_CRED"
     # printf is a builtin: the password shows up neither in ps nor in the shell history.
-    printf 'username=%s\npassword=%s\n' "$user" "$pass" >"$NAS_CRED"
+    printf 'username=%s\npassword=%s\n' "$user" "$pass" >"$SHARE_CRED"
     unset pass
-    note "credentials saved in $NAS_CRED (600 root)"
+    note "credentials saved in $SHARE_CRED (600 root)"
   fi
 }
 
@@ -206,33 +206,33 @@ step_dirs() {
   ok "Owned by $HL_USER, setgid set"
 }
 
-step_nas() {
-  step "NAS"
-  if [[ -z $HL_NAS_SHARE ]]; then skip "no NAS"; return; fi
+step_share() {
+  step "Network share"
+  if [[ -z $HL_SHARE ]]; then skip "no network share"; return; fi
   local line n bak
-  line="$HL_NAS_SHARE $HL_NAS_MOUNT cifs $HL_NAS_MODE,credentials=$NAS_CRED,uid=$HL_USER,gid=$HL_GROUP,file_mode=0644,dir_mode=0755,_netdev,nofail 0 0"
-  mkdir -p "$HL_NAS_MOUNT"
+  line="$HL_SHARE $HL_SHARE_MOUNT cifs $HL_SHARE_MODE,credentials=$SHARE_CRED,uid=$HL_USER,gid=$HL_GROUP,file_mode=0644,dir_mode=0755,_netdev,nofail 0 0"
+  mkdir -p "$HL_SHARE_MOUNT"
   if grep -qxF "$line" /etc/fstab; then
     ok "fstab already up to date"
   else
     bak=/etc/fstab.bak.$(date +%Y%m%d-%H%M%S)
     cp -a /etc/fstab "$bak"
-    { awk -v m="$HL_NAS_MOUNT" '!($2 == m && $3 == "cifs")' /etc/fstab; printf '%s\n' "$line"; } >"$TMP/fstab"
+    { awk -v m="$HL_SHARE_MOUNT" '!($2 == m && $3 == "cifs")' /etc/fstab; printf '%s\n' "$line"; } >"$TMP/fstab"
     cat "$TMP/fstab" >/etc/fstab                # cat > keeps inode, permissions and context
     systemctl daemon-reload
     # Options changed on a mounted share: unmount so they apply on remount.
-    if mountpoint -q "$HL_NAS_MOUNT"; then umount "$HL_NAS_MOUNT" >>"$LOG" 2>&1 || true; fi
+    if mountpoint -q "$HL_SHARE_MOUNT"; then umount "$HL_SHARE_MOUNT" >>"$LOG" 2>&1 || true; fi
     ok "fstab updated"
     note "backup: $bak"
   fi
-  if mountpoint -q "$HL_NAS_MOUNT"; then
-    ok "Already mounted on $HL_NAS_MOUNT"
-  elif spin "Mounting $HL_NAS_SHARE" mount "$HL_NAS_MOUNT"; then
-    n=$(find "$HL_NAS_MOUNT" -mindepth 1 -maxdepth 1 | wc -l)
-    ok "Mounted on $HL_NAS_MOUNT ($n entries)"
+  if mountpoint -q "$HL_SHARE_MOUNT"; then
+    ok "Already mounted on $HL_SHARE_MOUNT"
+  elif spin "Mounting $HL_SHARE" mount "$HL_SHARE_MOUNT"; then
+    n=$(find "$HL_SHARE_MOUNT" -mindepth 1 -maxdepth 1 | wc -l)
+    ok "Mounted on $HL_SHARE_MOUNT ($n entries)"
   else
-    warn "mount failed: NAS off or wrong credentials"
-    note "fix $NAS_CRED, then: sudo mount $HL_NAS_MOUNT"
+    warn "mount failed: share unreachable or wrong credentials"
+    note "fix $SHARE_CRED, then: sudo mount $HL_SHARE_MOUNT"
   fi
 }
 
@@ -263,7 +263,7 @@ check() {
   chk "SSH root login refused"           bash -c "sshd -T | grep -qx 'permitrootlogin no'"
   chk "SSH password login refused"       bash -c "sshd -T | grep -qx 'passwordauthentication no'"
   chk "Timezone $HL_TIMEZONE"            test "$(current_tz)" = "$HL_TIMEZONE"
-  if [[ -n $HL_NAS_SHARE ]]; then chk "NAS mounted on $HL_NAS_MOUNT" mountpoint -q "$HL_NAS_MOUNT"; fi
+  if [[ -n $HL_SHARE ]]; then chk "Network share mounted on $HL_SHARE_MOUNT" mountpoint -q "$HL_SHARE_MOUNT"; fi
   if [[ $HL_IPV6 == off ]]; then chk "IPv6 disabled" test ! -e /proc/net/if_inet6; fi
   note "/: $(df -h --output=avail,size / | tail -n1 | awk '{print $1 " free of " $2}')"
 }
@@ -289,7 +289,7 @@ main() {
   fi
 
   run_steps step_settings step_packages step_qemu_agent step_auto_upgrades step_timezone \
-            step_disk step_ssh step_dirs step_nas step_ipv6
+            step_disk step_ssh step_dirs step_share step_ipv6
   mark_done
   [[ ! -f /var/run/reboot-required ]] || NEED_REBOOT=1
   finish "Done"

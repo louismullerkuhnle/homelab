@@ -10,7 +10,7 @@ What you need to code on a dev VM, or to let Claude Code work on it: [mise](http
 
 ## Why a separate dev VM
 
-An agent like Claude Code runs commands. On a dedicated VM, it can reach neither production services nor production secrets, and a mistake is fixed by restoring a snapshot. Mount the NAS read-only (`ro`), or not at all.
+An agent like Claude Code runs commands. On a dedicated VM, it can reach neither production services nor production secrets, and a mistake is fixed by restoring a snapshot. Mount the network share read-only (`ro`), or not at all.
 
 ## Script
 
