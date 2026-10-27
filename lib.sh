@@ -227,7 +227,8 @@ ask() {
   IFS= read -e -r -p "$__prompt" __answer </dev/tty
   if (( TTY )); then
     __cols=$(tty_cols)
-    __lines=$(( (${#__prompt} + ${#__answer}) / __cols + 1 ))
+    # Rounded up: a line exactly as wide as the terminal takes one line, not two.
+    __lines=$(( (${#__prompt} + ${#__answer} + __cols - 1) / __cols ))
     printf '\033[%dA\r\033[J' "$__lines" >&2
   fi
   printf -v "$1" '%s' "$__answer"
