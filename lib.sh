@@ -201,12 +201,16 @@ prompt() {
 has_tty() { { : </dev/tty; } 2>/dev/null; }
 
 # ask <variable> <question>: "  ? question: …" on an editable line (arrows, Backspace),
-# cleared afterwards so that the caller's "  ✓ …" line takes its exact place.
+# cleared afterwards so that the caller's "  ✓ …" line takes its exact place, even if it wrapped.
 ask() {
-  local __answer
+  local __answer __prompt="  ? $2: " __cols __lines
   has_tty || die "input required: run from a terminal (ssh -t)"
-  IFS= read -e -r -p "  ? $2: " __answer </dev/tty
-  if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
+  IFS= read -e -r -p "$__prompt" __answer </dev/tty
+  if (( TTY )); then
+    __cols=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2 || true)
+    __lines=$(( (${#__prompt} + ${#__answer}) / ${__cols:-80} + 1 ))
+    printf '\033[%dA\r\033[J' "$__lines" >&2
+  fi
   printf -v "$1" '%s' "$__answer"
 }
 # Same, with one * per typed character; Backspace works. Stars stop at the terminal edge: a wrapped line
