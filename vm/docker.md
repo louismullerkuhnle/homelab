@@ -86,7 +86,13 @@ systemctl is-active docker containerd                                           
 docker run --rm hello-world && docker rmi hello-world
 ```
 
-Proxmox: VM → **Snapshots** → **Take Snapshot**.
+Snapshot with the VM **powered off**: the disk is frozen with no write in progress, and there is no RAM to save.
+
+```bash
+sudo poweroff
+```
+
+Proxmox: VM → **Snapshots** → **Take Snapshot**, name `docker`, **Include RAM** unchecked; then start the VM.
 
 ## Undo
 

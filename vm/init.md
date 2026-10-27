@@ -138,7 +138,13 @@ sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication'                 
 df -h / /mnt/share
 ```
 
-Proxmox: VM → **Snapshots** → **Take Snapshot**.
+Snapshot with the VM **powered off**: the disk is frozen with no write in progress, and there is no RAM to save.
+
+```bash
+sudo poweroff
+```
+
+Proxmox: VM → **Snapshots** → **Take Snapshot**, name `init`, **Include RAM** unchecked; then start the VM.
 
 ## Notes
 

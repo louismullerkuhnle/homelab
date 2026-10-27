@@ -296,9 +296,14 @@ main() {
   finish "Done"
   if (( NEED_REBOOT && reboot )); then note "rebooting in 5 s"; sleep 5; systemctl reboot; fi
   if (( NEED_REBOOT )); then
-    next_steps "Test a new SSH session from your workstation" "sudo reboot" "Run again with --check" "Take a Proxmox snapshot"
+    next_steps "Test a new SSH session from your workstation" \
+               "sudo reboot" \
+               "curl -fsSL $HL_RAW/vm/init.sh | sudo bash -s -- --check" \
+               "sudo poweroff, then Proxmox: Snapshots → Take Snapshot, name \"init\", RAM unchecked → start the VM"
   else
-    next_steps "Test a new SSH session from your workstation" "Run again with --check" "Take a Proxmox snapshot"
+    next_steps "Test a new SSH session from your workstation" \
+               "curl -fsSL $HL_RAW/vm/init.sh | sudo bash -s -- --check" \
+               "sudo poweroff, then Proxmox: Snapshots → Take Snapshot, name \"init\", RAM unchecked → start the VM"
   fi
 }
 

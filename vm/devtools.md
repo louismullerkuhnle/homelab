@@ -79,9 +79,19 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 > Official installer: installs into `~/.local/bin` and updates itself. It refuses to run with `sudo`.
 
+### 5. Take a snapshot
+
+Snapshot with the VM **powered off**: the disk is frozen with no write in progress, and there is no RAM to save.
+
+```bash
+sudo poweroff
+```
+
+Proxmox: VM → **Snapshots** → **Take Snapshot**, name `devtools`, **Include RAM** unchecked; then start the VM.
+
 ## Undo
 
-Restore the snapshot taken before.
+Restore the `docker` snapshot (or `init` if Docker is not installed).
 
 ## Notes
 

@@ -155,7 +155,8 @@ main() {
     run_steps step_settings step_packages step_repos step_install step_tools step_claude check
     mark_done
     finish "Done"
-    next_steps "Log in again to enable mise" "Take a Proxmox snapshot"
+    next_steps "Log out and back in, then: claude (to authenticate)" \
+               "sudo poweroff, then Proxmox: Snapshots → Take Snapshot, name \"devtools\", RAM unchecked → start the VM"
   fi
   hl_exit
 }
