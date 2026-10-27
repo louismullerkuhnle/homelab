@@ -135,7 +135,7 @@ require_pve() {
 }
 
 # --- Settings ----------------------------------------------------------------------------------------
-# Priority: environment variable, then /etc/homelab.conf, then a question (with the default pre-filled).
+# Priority: environment variable, then /etc/homelab.conf, then a question (default shown in brackets).
 # The chosen value is saved: the question is asked once, --reconfigure asks again.
 # ASK=0 (--check mode): never asks, uses the default when nothing is saved.
 
@@ -160,7 +160,7 @@ is_valid() {
 
 # setting <VAR> <question> <default> [<rule>]
 # The question reads "Label (hint)", the answer is then shown as "✓ Label: value" at the same place.
-# The default is pre-filled and editable; an empty answer means "none". An invalid answer is asked again.
+# Enter keeps the default shown in brackets, "none" clears the value. An invalid answer is asked again.
 setting() {
   local var=$1 question=$2 default=$3 rule=${4:-} value warned=0
   if [[ -n ${!var+x} ]]; then
@@ -173,7 +173,8 @@ setting() {
     if (( ASK )) && has_tty; then
       # A single warning line: replaced on each new attempt, removed once the answer is valid.
       while :; do
-        ask value "$question" "$value"
+        ask value "$question${default:+ [$default]}"
+        if [[ -z $value ]]; then value=$default; elif [[ ${value,,} == none ]]; then value=''; fi
         if (( warned && TTY )); then printf '\033[1A\033[2K' >&2; fi
         if is_valid "$value" "$rule"; then break; fi
         printf '  %s!%s %s: "%s" is not valid, try again\n' "$YEL" "$RST" "${question%% (*}" "$value" >&2
@@ -194,12 +195,12 @@ setting() {
 # With `curl | bash`, stdin is the script itself: answers are read from /dev/tty.
 has_tty() { { : </dev/tty; } 2>/dev/null; }
 
-# ask <variable> <question> [<pre-filled value>]: "  ? question: …" on an editable line (arrows, Backspace),
+# ask <variable> <question>: "  ? question: …" on an editable line (arrows, Backspace),
 # cleared afterwards so that the caller's "  ✓ …" line takes its exact place.
 ask() {
   local __answer
   has_tty || die "input required: run from a terminal (ssh -t)"
-  IFS= read -e -r -i "${3:-}" -p "  ? $2: " __answer </dev/tty
+  IFS= read -e -r -p "  ? $2: " __answer </dev/tty
   if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
   printf -v "$1" '%s' "$__answer"
 }

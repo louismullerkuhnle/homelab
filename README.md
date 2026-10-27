@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/i
 
 Pass an option like this: `curl … | sudo bash -s -- --check`. On the Proxmox host you are root: no `sudo`.
 
-**Settings**: on first run, each script asks its questions (user, network share…) with a default value, then saves the answers in `/etc/homelab.conf`. An environment variable takes precedence: `curl … | sudo env HL_IPV6=off bash`. Passwords and tokens are typed as hidden input and never leave the machine.
+**Settings**: on first run, each script asks its questions (user, network share…) with a default value in brackets (Enter keeps it, `none` clears it), then saves the answers in `/etc/homelab.conf`. An environment variable takes precedence: `curl … | sudo env HL_IPV6=off bash`. Passwords and tokens are typed as hidden input and never leave the machine.
 
 ## Output
 
