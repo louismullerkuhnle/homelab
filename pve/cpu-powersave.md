@@ -1,12 +1,12 @@
 # CPU throttling on the Proxmox host
 
-Lower the power draw and noise of a Proxmox host with an Intel CPU: power limit in the BIOS, then turbo, governor and energy performance preference (EPP) through the `cpu-powersave` command, reapplied at every boot.
+Lower the power draw and noise of a Proxmox host with an Intel or AMD CPU: power limit in the BIOS, then turbo, governor and energy performance preference (EPP) through the `cpu-powersave` command, reapplied at every boot.
 
 |               |                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------- |
-| **Target**    | Proxmox VE 9 host (Debian 13), Intel CPU with the `intel_pstate` driver                                 |
+| **Target**    | Proxmox VE 9 host (Debian 13), Intel CPU with the `intel_pstate` driver or AMD CPU with `amd-pstate-epp` |
 | **Files**     | `/usr/local/sbin/cpu-powersave`, `/etc/cpu-powersave.conf`, `/etc/systemd/system/cpu-powersave.service` |
-| **Tested on** | Intel Core Ultra 9 185H                                                                                 |
+| **Tested on** | Intel Core Ultra 9 185H; AMD untested on real hardware                                                  |
 
 ## Script
 
@@ -27,7 +27,7 @@ Check: `curl … | bash -s -- --check` · undo: `--uninstall`.
 
 ### 0. BIOS
 
-The only power setting; its name depends on the motherboard (*Power Mode*, *Power Limit*, *TDP*…).
+The only power setting; its name depends on the motherboard: *Power Mode*, *Power Limit*, *TDP* on Intel; *PPT*, *Eco Mode*, *cTDP* on AMD.
 
 | Limit           | Role                                   |
 | --------------- | -------------------------------------- |
@@ -35,14 +35,18 @@ The only power setting; its name depends on the motherboard (*Power Mode*, *Powe
 | PL2 (bursts)    | maximum power during short bursts      |
 
 > For a server, lowering PL2 mostly reduces peaks and fan noise. Example on a Core Ultra 9 185H: *Quiet* mode = PL1 45 W, PL2 50 W, versus 45 / 70 W in normal mode.
+>
+> The script reads PL1/PL2 from `intel-rapl`; if Linux does not expose them, the BIOS check is skipped.
 
 ### 1. Inspect the hardware
 
 ```bash
-cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver                               # intel_pstate
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver                               # intel_pstate or amd-pstate-epp
 cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor                             # performance on Proxmox
 cat /sys/class/powercap/intel-rapl:0/constraint_{0,1}_power_limit_uw                  # PL1, PL2 in µW
 ```
+
+> AMD with `amd-pstate` (passive or guided mode): EPP needs the active mode. Test it with `echo active > /sys/devices/system/cpu/amd_pstate/status`, then make it permanent with `amd_pstate=active` on the [kernel command line](https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysboot_edit_kernel_cmdline) and reboot. `acpi-cpufreq` on AMD: enable CPPC in the BIOS.
 
 ### 2. Install the `cpu-powersave` command
 
@@ -107,7 +111,8 @@ The menu shows the current state, offers the profiles, asks for confirmation, th
 systemctl disable --now cpu-powersave.service
 rm -f /etc/systemd/system/cpu-powersave.service /usr/local/sbin/cpu-powersave /etc/cpu-powersave.conf
 systemctl daemon-reload
-echo 0 > /sys/devices/system/cpu/intel_pstate/no_turbo
+echo 0 > /sys/devices/system/cpu/intel_pstate/no_turbo                                # Intel
+echo 1 > /sys/devices/system/cpu/cpufreq/boost                                        # AMD
 for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/energy_performance_preference; do echo balance_performance > "$f"; done
 ```
 
@@ -116,5 +121,6 @@ for f in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/energy_performance_preference
 ## Notes
 
 - **Levers**: the BIOS caps power under sustained load; turbo and EPP act on short bursts, most of a home server's load.
+- **Turbo**: `intel_pstate/no_turbo` on Intel (1 = off), `cpufreq/boost` on AMD (1 = on), per core if the global file is missing.
 - **Governor**: the Proxmox kernel boots with `performance`, which locks EPP to `performance`; without switching to `powersave`, EPP would have no effect.
 - **Conflicts**: do not combine with TLP, `tuned` or `power-profiles-daemon`: the last writer wins.

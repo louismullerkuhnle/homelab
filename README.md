@@ -10,7 +10,7 @@ Each procedure has a step-by-step guide (`.md`) and a script (`.sh`) that does t
 | ------------ | ------------------------------------------- | ----------------------------------------------------- |
 | Workstation  | [workstation/ssh](workstation/ssh.md)       | SSH key, machine aliases, key added to the machines   |
 | Proxmox host | [pve/cloudflared](pve/cloudflared.md)       | Web UI through a Cloudflare tunnel, behind Access     |
-| Proxmox host | [pve/cpu-powersave](pve/cpu-powersave.md)   | Intel CPU throttling: turbo, governor, EPP            |
+| Proxmox host | [pve/cpu-powersave](pve/cpu-powersave.md)   | CPU throttling (Intel, AMD): turbo, governor, EPP     |
 | VM           | [vm/init](vm/init.md)                       | First boot: system, hardened SSH, disk, network share |
 | VM           | [vm/docker](vm/docker.md)                   | Docker Engine, log rotation                           |
 | Dev VM       | [vm/devtools](vm/devtools.md)               | mise (node, bun, python…), GitHub CLI, Claude Code    |

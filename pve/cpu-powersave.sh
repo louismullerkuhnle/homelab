@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Intel CPU throttling on the Proxmox host: turbo, governor, EPP, reapplied at boot.
+# CPU throttling on the Proxmox host (Intel, AMD): turbo, governor, EPP, reapplied at boot.
 #
 #   curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/pve/cpu-powersave.sh | bash
 #   … | bash -s -- --check        check            … | bash -s -- --uninstall     undo
@@ -34,7 +34,8 @@ PROFILE=''
 tool() {
   cat <<'TOOL'
 #!/bin/bash
-# CPU throttling for a Proxmox host with an Intel CPU (intel_pstate driver): turbo, governor, EPP.
+# CPU throttling for a Proxmox host: turbo, governor, EPP.
+# Driver: intel_pstate (Intel) or amd-pstate-epp (AMD, amd_pstate=active).
 #   cpu-powersave          menu: pick a setting, save it and apply it
 #   cpu-powersave apply    applies the saved setting (run at boot by cpu-powersave.service)
 #   cpu-powersave status   saved setting and actual CPU state
@@ -44,6 +45,7 @@ set -uo pipefail
 CONF=/etc/cpu-powersave.conf
 CPU=/sys/devices/system/cpu
 RAPL=/sys/class/powercap/intel-rapl:0
+DRIVER=$(cat "$CPU/cpu0/cpufreq/scaling_driver" 2>/dev/null)
 
 # Writes a value; a refusal is logged without stopping the script
 w() { { echo "$1" > "$2"; } 2>/dev/null || echo "failed: $2 ← $1" >&2; }
@@ -62,17 +64,47 @@ save() {
     "$TURBO" "$EPP" > "$CONF"
 }
 
-# 1. Turbo (1 = off), 2. powersave governor (the only mode where EPP applies), 3. EPP
+# Turbo: intel_pstate/no_turbo (1 = off) on Intel; cpufreq/boost (1 = on) on AMD, global or else per core
+set_turbo() {
+  local v f
+  if [ "$DRIVER" = intel_pstate ]; then
+    if [ "$1" = on ]; then v=0; else v=1; fi
+    w "$v" "$CPU/intel_pstate/no_turbo"
+    return
+  fi
+  if [ "$1" = on ]; then v=1; else v=0; fi
+  if [ -e "$CPU/cpufreq/boost" ]; then
+    w "$v" "$CPU/cpufreq/boost"
+  else
+    for f in "$CPU"/cpu[0-9]*/cpufreq/boost; do w "$v" "$f"; done
+  fi
+}
+
+# on, off, or ? if unreadable or not the same on every core
+get_turbo() {
+  local v
+  if [ "$DRIVER" = intel_pstate ]; then
+    case "$(cat "$CPU/intel_pstate/no_turbo" 2>/dev/null)" in 1) echo off ;; 0) echo on ;; *) echo '?' ;; esac
+    return
+  fi
+  if [ -e "$CPU/cpufreq/boost" ]; then
+    v=$(cat "$CPU/cpufreq/boost" 2>/dev/null)
+  else
+    v=$(sort -u "$CPU"/cpu[0-9]*/cpufreq/boost 2>/dev/null | paste -sd,)
+  fi
+  case "$v" in 1) echo on ;; 0) echo off ;; *) echo '?' ;; esac
+}
+
+# 1. Turbo, 2. powersave governor (the only mode where EPP applies), 3. EPP
 apply() {
-  [ "$TURBO" = off ] && v=1 || v=0
-  w "$v" "$CPU/intel_pstate/no_turbo"
+  set_turbo "$TURBO"
   for f in "$CPU"/cpu[0-9]*/cpufreq/scaling_governor; do w powersave "$f"; done
   for f in "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference; do w "$EPP" "$f"; done
 }
 
 status() {
   local turbo pl="?"
-  [ "$(cat "$CPU/intel_pstate/no_turbo")" = 1 ] && turbo=off || turbo=on
+  turbo=$(get_turbo)
   [ -r "$RAPL/constraint_1_power_limit_uw" ] && pl="PL1 $(( $(cat "$RAPL/constraint_0_power_limit_uw") / 1000000 )) W  PL2 $(( $(cat "$RAPL/constraint_1_power_limit_uw") / 1000000 )) W"
   echo "Saved     : TURBO=$TURBO  EPP=$EPP  ($CONF)"
   echo "Applied   : TURBO=$turbo  EPP=$(cat "$CPU/cpu0/cpufreq/energy_performance_preference")  governor=$(cat "$CPU/cpu0/cpufreq/scaling_governor")"
@@ -137,8 +169,10 @@ menu() {
 }
 
 [ "$EUID" -eq 0 ] || { echo "Must run as root." >&2; exit 1; }
-[ "$(cat "$CPU/cpu0/cpufreq/scaling_driver" 2>/dev/null)" = intel_pstate ] \
-  || { echo "intel_pstate missing: an Intel CPU with the intel_pstate driver is required." >&2; exit 1; }
+case "$DRIVER" in
+  intel_pstate|amd-pstate-epp) ;;
+  *) echo "Driver ${DRIVER:-missing}: intel_pstate (Intel) or amd-pstate-epp (AMD) is required." >&2; exit 1 ;;
+esac
 
 load
 case "${1:-menu}" in
@@ -154,11 +188,30 @@ TOOL
 # RAPL limit in W; empty if unavailable.
 rapl_w() { if [[ -r $RAPL/constraint_$1_power_limit_uw ]]; then echo $(( $(cat "$RAPL/constraint_$1_power_limit_uw") / 1000000 )); fi; }
 
-require_intel_pstate() {
+require_driver() {
   local driver
   driver=$(cat "$CPU/cpu0/cpufreq/scaling_driver" 2>/dev/null || true)
-  [[ $driver == intel_pstate ]] || die "driver ${driver:-missing}: an Intel CPU with intel_pstate is required"
-  [[ -e $CPU/cpu0/cpufreq/energy_performance_preference ]] || die "EPP unavailable: CPU without HWP"
+  case $driver in
+    intel_pstate)   ;;
+    amd-pstate-epp) warn "AMD support is untested on real hardware: check the result below" ;;
+    amd-pstate)     die "amd-pstate in passive or guided mode: add amd_pstate=active to the kernel command line, then reboot" ;;
+    intel_cpufreq)  die "intel_pstate in passive mode: remove intel_pstate=passive from the kernel command line, then reboot" ;;
+    acpi-cpufreq)   die "acpi-cpufreq driver: on AMD, enable CPPC in the BIOS; on Intel, remove intel_pstate=disable" ;;
+    *)              die "driver ${driver:-missing}: intel_pstate (Intel) or amd-pstate-epp (AMD) is required" ;;
+  esac
+  [[ -e $CPU/cpu0/cpufreq/energy_performance_preference ]] || die "EPP unavailable: CPU without HWP (Intel) or CPPC (AMD)"
+}
+
+# Turbo back on, as at boot: no_turbo on Intel, boost on AMD.
+turbo_on() {
+  local f
+  if [[ -e $CPU/intel_pstate/no_turbo ]]; then
+    { echo 0 >"$CPU/intel_pstate/no_turbo"; } 2>/dev/null
+  elif [[ -e $CPU/cpufreq/boost ]]; then
+    { echo 1 >"$CPU/cpufreq/boost"; } 2>/dev/null
+  else
+    for f in "$CPU"/cpu[0-9]*/cpufreq/boost; do { echo 1 >"$f"; } 2>/dev/null || return 1; done
+  fi
 }
 
 # BIOS limits are saved so that --check spots a BIOS reset. Default: current values.
@@ -286,12 +339,13 @@ check() {
   saved_turbo=$(. "$CONF" 2>/dev/null && echo "${TURBO:-}" || true)
   # shellcheck source=/dev/null
   saved_epp=$(. "$CONF" 2>/dev/null && echo "${EPP:-}" || true)
-  if [[ $(cat "$CPU/intel_pstate/no_turbo") == 1 ]]; then turbo=off; else turbo=on; fi
+  # Read by the command itself, which knows the Intel and AMD interfaces.
+  turbo=$("$BIN" status 2>/dev/null | sed -n 's/^Applied *: TURBO=\([a-z?]*\).*/\1/p' || true)
   # Every core, not just cpu0: a refused write on one core would go unnoticed.
   bad=$( { grep -L -x "$saved_epp" "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference || true; } | wc -l)
   epp=$(sort -u "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference | paste -sd' ')
   gov=$(sort -u "$CPU"/cpu[0-9]*/cpufreq/scaling_governor | paste -sd' ')
-  chk "Turbo $turbo (profile: $saved_turbo)"   test "$turbo" = "$saved_turbo"
+  chk "Turbo ${turbo:-?} (profile: $saved_turbo)" test "$turbo" = "$saved_turbo"
   chk "Governor $gov on every core"            test "$gov" = powersave
   chk "EPP $epp on every core"                 test "$bad" -eq 0
   chk "No refused write since boot"            bash -c "! journalctl -u cpu-powersave -b --no-pager -o cat | grep -q failed"
@@ -314,7 +368,7 @@ uninstall() {
   rm -f "$UNIT" "$BIN" "$CONF"
   systemctl daemon-reload
   ok "Command, profile and service removed"
-  if echo 0 >"$CPU/intel_pstate/no_turbo"; then ok "Turbo re-enabled"; else warn "turbo not re-enabled"; fi
+  if turbo_on; then ok "Turbo re-enabled"; else warn "turbo not re-enabled"; fi
   for f in "$CPU"/cpu[0-9]*/cpufreq/energy_performance_preference; do
     echo balance_performance >"$f" 2>/dev/null || warn "EPP not restored on $f"
   done
@@ -334,7 +388,7 @@ main() {
   done
   start pve/cpu-powersave "CPU throttling"
   require_pve 9
-  require_intel_pstate
+  require_driver
 
   case $mode in
     check)
