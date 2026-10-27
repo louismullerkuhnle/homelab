@@ -158,11 +158,10 @@ is_valid() {
   if [[ $2 == @* ]]; then "${2#@}" "$1"; else [[ $1 =~ $2 ]]; fi
 }
 
-# setting <VAR> <question> <default> [<rule>]
-# The question reads "Label (hint)", the answer is then shown as "✓ Label: value" at the same place.
-# Enter keeps the default shown in brackets, "none" clears the value. An invalid answer is asked again.
+# setting <VAR> <question> <default> [<rule>]: answer from the environment, /etc/homelab.conf or prompt,
+# then saved and shown as "✓ Label: value" at the place of the question.
 setting() {
-  local var=$1 question=$2 default=$3 rule=${4:-} value warned=0
+  local var=$1 question=$2 default=$3 rule=${4:-} value
   if [[ -n ${!var+x} ]]; then
     value=${!var}
   elif conf_has "$var" && (( ! RECONFIGURE || ! ASK )); then
@@ -170,17 +169,7 @@ setting() {
   else
     if conf_has "$var"; then default=$(conf_get "$var"); fi
     value=$default
-    if (( ASK )) && has_tty; then
-      # A single warning line: replaced on each new attempt, removed once the answer is valid.
-      while :; do
-        ask value "$question${default:+ [$default]}"
-        if [[ -z $value ]]; then value=$default; elif [[ ${value,,} == none ]]; then value=''; fi
-        if (( warned && TTY )); then printf '\033[1A\033[2K' >&2; fi
-        if is_valid "$value" "$rule"; then break; fi
-        printf '  %s!%s %s: "%s" is not valid, try again\n' "$YEL" "$RST" "${question%% (*}" "$value" >&2
-        warned=1
-      done
-    fi
+    if (( ASK )) && has_tty; then prompt value "$question" "$default" "$rule"; fi
   fi
   is_valid "$value" "$rule" || die "invalid $var: $value"
   printf -v "$var" '%s' "$value"
@@ -188,6 +177,22 @@ setting() {
     conf_set "$var" "$value"
     ok "${question%% (*}: ${value:-none}"
   fi
+}
+
+# prompt <variable> <question> <default> [<rule>]: asks until the answer is valid, saves nothing.
+# The question reads "Label (hint)". Enter keeps the default shown in brackets, "none" clears the value.
+# A single warning line: replaced on each new attempt, removed once the answer is valid.
+prompt() {
+  local __question=$2 __default=$3 __rule=${4:-} __value __warned=0
+  while :; do
+    ask __value "$__question${__default:+ [$__default]}"
+    if [[ -z $__value ]]; then __value=$__default; elif [[ ${__value,,} == none ]]; then __value=''; fi
+    if (( __warned && TTY )); then printf '\033[1A\033[2K' >&2; fi
+    if is_valid "$__value" "$__rule"; then break; fi
+    printf '  %s!%s %s: "%s" is not valid, try again\n' "$YEL" "$RST" "${__question%% (*}" "$__value" >&2
+    __warned=1
+  done
+  printf -v "$1" '%s' "$__value"
 }
 
 # --- Helpers -----------------------------------------------------------------------------------------
