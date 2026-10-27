@@ -204,22 +204,25 @@ ask() {
   if (( TTY )); then printf '\033[1A\033[2K' >&2; fi
   printf -v "$1" '%s' "$__answer"
 }
-# Same, with one * per typed character, capped so that the line never wraps; Backspace works.
+# Same, with one * per typed character; Backspace works. Stars stop at the terminal edge: a wrapped line
+# could not be cleared, but every character is still recorded.
 ask_secret() {
-  local __answer='' __c
+  local __answer='' __c __prompt="  ? $2: " __max __cols
   has_tty || die "input required: run from a terminal (ssh -t)"
-  printf '  ? %s: ' "$2" >&2
+  __cols=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2 || true)
+  __max=$(( ${__cols:-80} - ${#__prompt} - 1 ))
+  printf '%s' "$__prompt" >&2
   while IFS= read -rsn1 __c </dev/tty; do
     case $__c in
       '') break ;;
       $'\x7f'|$'\b')
         if [[ -n $__answer ]]; then
-          if (( ${#__answer} <= 24 )); then printf '\b \b' >&2; fi
+          if (( ${#__answer} <= __max )); then printf '\b \b' >&2; fi
           __answer=${__answer%?}
         fi ;;
       *)
         __answer+=$__c
-        if (( ${#__answer} <= 24 )); then printf '*' >&2; fi ;;
+        if (( ${#__answer} <= __max )); then printf '*' >&2; fi ;;
     esac
   done
   if (( TTY )); then printf '\r\033[2K' >&2; else echo >&2; fi
