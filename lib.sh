@@ -54,14 +54,15 @@ spin() {
   fi
   return "$rc"
 }
-# Required action: ✓, or the tail of its output and stop.
+# Required action: ✓, or ✗ followed by the end of its output, then stop.
 run() {
   local desc=$1 rc=0
   spin "$@" || rc=$?
   if (( rc == 0 )); then ok "$desc"; return 0; fi
-  printf '%s' "$CLR"
+  ko "$desc (exit $rc)"
   tail -n +"$RUN_START" "$LOG" | tail -n 15 | sed 's/^/    │ /' >&2
-  die "$desc (exit $rc)"
+  printf '    %slog: %s%s\n' "$DIM" "$LOG" "$RST" >&2
+  exit 1
 }
 # Check: ✓ or ✗, without stopping the script.
 chk() {
