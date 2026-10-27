@@ -200,6 +200,13 @@ prompt() {
 # With `curl | bash`, stdin is the script itself: answers are read from /dev/tty.
 has_tty() { { : </dev/tty; } 2>/dev/null; }
 
+# Terminal width; 80 if unknown (0 on a serial console or a pty without a size).
+tty_cols() {
+  local c
+  c=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2 || true)
+  if [[ $c =~ ^[1-9][0-9]*$ ]]; then echo "$c"; else echo 80; fi
+}
+
 # ask <variable> <question>: "  ? question: …" on an editable line (arrows, Backspace),
 # cleared afterwards so that the caller's "  ✓ …" line takes its exact place, even if it wrapped.
 ask() {
@@ -207,8 +214,8 @@ ask() {
   has_tty || die "input required: run from a terminal (ssh -t)"
   IFS= read -e -r -p "$__prompt" __answer </dev/tty
   if (( TTY )); then
-    __cols=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2 || true)
-    __lines=$(( (${#__prompt} + ${#__answer}) / ${__cols:-80} + 1 ))
+    __cols=$(tty_cols)
+    __lines=$(( (${#__prompt} + ${#__answer}) / __cols + 1 ))
     printf '\033[%dA\r\033[J' "$__lines" >&2
   fi
   printf -v "$1" '%s' "$__answer"
@@ -218,8 +225,8 @@ ask() {
 ask_secret() {
   local __answer='' __c __prompt="  ? $2: " __max __cols
   has_tty || die "input required: run from a terminal (ssh -t)"
-  __cols=$(stty size </dev/tty 2>/dev/null | cut -d' ' -f2 || true)
-  __max=$(( ${__cols:-80} - ${#__prompt} - 1 ))
+  __cols=$(tty_cols)
+  __max=$(( __cols - ${#__prompt} - 1 ))
   printf '%s' "$__prompt" >&2
   while IFS= read -rsn1 __c </dev/tty; do
     case $__c in
