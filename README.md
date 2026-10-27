@@ -15,7 +15,21 @@ Each procedure has a step-by-step guide (`.md`) and a script (`.sh`) that does t
 | VM           | [vm/docker](vm/docker.md)                   | Docker Engine, log rotation                           |
 | Dev VM       | [vm/devtools](vm/devtools.md)               | mise (node, bun, python…), GitHub CLI, Claude Code    |
 
-On a VM: `init`, then `docker`, then `devtools` for a dev VM. The Proxmox procedures are independent.
+The Proxmox procedures are independent. A VM follows the order below.
+
+## New VM, step by step
+
+Snapshots are taken with the VM powered off (`sudo poweroff`, then Proxmox → **Snapshots** → **Take Snapshot**, then start the VM): the disk is frozen with no write in progress.
+
+| # | Where       | Action                                                                                         | Snapshot   |
+| - | ----------- | ---------------------------------------------------------------------------------------------- | ---------- |
+| 1 | Proxmox     | Create the VM with **QEMU Guest Agent** checked, install Ubuntu Server 26.04 with **OpenSSH server**, remove the ISO | `install`  |
+| 2 | Workstation | Add your SSH key to the VM: [workstation/ssh](workstation/ssh.md), or import it from GitHub in step 3 | |
+| 3 | VM          | [vm/init](vm/init.md), reboot, `--check`                                                       | `config`   |
+| 4 | VM          | [vm/docker](vm/docker.md), log in again, `--check`                                             | `docker`   |
+| 5 | Dev VM only | [vm/devtools](vm/devtools.md), log in again, `--check`                                         | `devtools` |
+
+Each script ends with the exact commands for its next steps.
 
 ## Running a script
 

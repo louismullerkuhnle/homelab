@@ -10,6 +10,8 @@ Updates, base tools, QEMU guest agent, automatic security updates, extended disk
 
 ## Script
 
+Before the first run, take a snapshot named `install` (VM powered off), to start over from a clean install if needed.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/init.sh | sudo bash
 ```
@@ -138,13 +140,13 @@ sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication'                 
 df -h / /mnt/share
 ```
 
-Snapshot with the VM **powered off**: the disk is frozen with no write in progress, and there is no RAM to save.
+Snapshot with the VM **powered off**: the disk is frozen with no write in progress.
 
 ```bash
 sudo poweroff
 ```
 
-Proxmox: VM → **Snapshots** → **Take Snapshot**, name `init`, **Include RAM** unchecked; then start the VM.
+Proxmox: VM → **Snapshots** → **Take Snapshot**, name `config`; then start the VM.
 
 ## Notes
 

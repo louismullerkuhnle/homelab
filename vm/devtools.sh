@@ -155,8 +155,9 @@ main() {
     run_steps step_settings step_packages step_repos step_install step_tools step_claude check
     mark_done
     finish "Done"
-    next_steps "Log out and back in, then: claude (to authenticate)" \
-               "sudo poweroff, then Proxmox: Snapshots → Take Snapshot, name \"devtools\", RAM unchecked → start the VM"
+    next_steps "Log out and back in, then run claude to authenticate" \
+               "Check: curl -fsSL $HL_RAW/vm/devtools.sh | sudo bash -s -- --check" \
+               "Snapshot: sudo poweroff, then Proxmox → Snapshots → Take Snapshot \"devtools\", then start the VM"
   fi
   hl_exit
 }

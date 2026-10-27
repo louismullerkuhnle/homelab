@@ -81,17 +81,17 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 ### 5. Take a snapshot
 
-Snapshot with the VM **powered off**: the disk is frozen with no write in progress, and there is no RAM to save.
+Snapshot with the VM **powered off**: the disk is frozen with no write in progress.
 
 ```bash
 sudo poweroff
 ```
 
-Proxmox: VM → **Snapshots** → **Take Snapshot**, name `devtools`, **Include RAM** unchecked; then start the VM.
+Proxmox: VM → **Snapshots** → **Take Snapshot**, name `devtools`; then start the VM.
 
 ## Undo
 
-Restore the `docker` snapshot (or `init` if Docker is not installed).
+Restore the `docker` snapshot (or `config` if Docker is not installed).
 
 ## Notes
 

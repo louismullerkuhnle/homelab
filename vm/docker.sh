@@ -172,9 +172,9 @@ main() {
       run_steps step_conflicts step_repo step_install step_logs step_group check
       mark_done
       finish "Done"
-      next_steps "Log out and back in, then: docker ps (no sudo)" \
-                 "curl -fsSL $HL_RAW/vm/docker.sh | sudo bash -s -- --check" \
-                 "sudo poweroff, then Proxmox: Snapshots → Take Snapshot, name \"docker\", RAM unchecked → start the VM" ;;
+      next_steps "Log out and back in: docker ps must work without sudo" \
+                 "Check: curl -fsSL $HL_RAW/vm/docker.sh | sudo bash -s -- --check" \
+                 "Snapshot: sudo poweroff, then Proxmox → Snapshots → Take Snapshot \"docker\", then start the VM" ;;
   esac
   hl_exit
 }
