@@ -89,7 +89,7 @@ step_packages() {
   else
     ok "Base tools already installed"
   fi
-  run "Removing unused packages" "${APT[@]}" autoremove
+  run "Removing unused packages" "${APT[@]}" autoremove --purge
 }
 
 step_qemu_agent() {

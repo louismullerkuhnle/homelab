@@ -32,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/louismullerkuhnle/homelab/main/vm/i
 ### 1. Update the system
 
 ```bash
-sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y
+sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove --purge -y
 ```
 
 > `Could not get lock` on first boot: `unattended-upgrades` is already running, wait for it to finish.
